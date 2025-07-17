@@ -19,7 +19,10 @@ Conversation {
             height: auto;
         }  
     }
-
+    #contents > * {
+        margin: 1 0 0 0;
+      
+    }
 }
 
 
@@ -39,14 +42,26 @@ Welcome {
 }
 
 Prompt {
+    padding-top: 1;
     CondensedPath {
+        margin: 1 1;
         width: 1fr;
         height: 1;
         text-wrap: nowrap;
-        color: $warning;
-        margin: 0 1;
-        
+        color: $text-warning;        
     }
+}
+
+
+UserInput {
+    border-left: vkey $primary;
+    background: $panel;
+    padding: 1 2;
+}
+
+AgentResponse {    
+    # margin: 0;
+    # padding: 0;
 }
 
 MainScreen {

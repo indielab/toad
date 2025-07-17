@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from textual.app import ComposeResult
 
 from textual.widgets import TextArea
@@ -11,11 +9,7 @@ from textual import events
 
 
 from toad.widgets.condensed_path import CondensedPath
-
-
-@dataclass
-class UserInput(Message):
-    body: str
+from toad.messages import UserInputSubmitted
 
 
 class MarkdownTextArea(TextArea):
@@ -33,7 +27,7 @@ class MarkdownTextArea(TextArea):
         if event.key == "enter":
             event.stop()
             event.prevent_default()
-            self.post_message(UserInput(self.text))
+            self.post_message(UserInputSubmitted(self.text))
             self.clear()
 
     def action_submit(self) -> None:

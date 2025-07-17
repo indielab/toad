@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from textual.message import Message
 
 
@@ -7,3 +9,8 @@ class WorkStarted(Message):
 
 class WorkFinished(Message):
     """Work has finished."""
+
+
+@dataclass
+class UserInputSubmitted(Message):
+    body: str

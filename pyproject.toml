@@ -9,6 +9,8 @@ dependencies = [
     "textual-dev>=1.7.0",
     "textual-speedups>=0.2.0",
     "click>=8.2.1",
+    "gitpython>=3.1.44",
+    "llm>=0.26",
 ]
 
 [tool.uv.workspace]

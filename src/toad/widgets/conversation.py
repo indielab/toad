@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual import containers
 from textual import getters
 from textual.widget import Widget
-from textual.widgets import Static
+
 from textual.reactive import var
 
 
@@ -11,6 +11,8 @@ from toad import messages
 from toad.widgets.prompt import Prompt
 from toad.widgets.throbber import Throbber
 from toad.widgets.welcome import Welcome
+from toad.widgets.user_input import UserInput
+from toad.widgets.agent_response import AgentResponse
 
 
 class Conversation(containers.VerticalScroll):
@@ -31,6 +33,13 @@ class Conversation(containers.VerticalScroll):
     @on(messages.WorkFinished)
     def on_work_finished(self) -> None:
         self.busy_count -= 1
+
+    @on(messages.UserInputSubmitted)
+    async def on_user_input_submitted(self, event: messages.UserInputSubmitted) -> None:
+        await self.post(UserInput(event.body))
+        agent_response = AgentResponse()
+        await self.post(agent_response)
+        agent_response.send_prompt(event.body)
 
     def watch_busy(self, busy: int) -> None:
         self.throbber.set_class(busy > 0, "-busy")

@@ -44,7 +44,7 @@ def condense_path(prefix: str, path: str, width: int) -> str:
     components = path.split("/")
     condensed = components
     for left, right in radiate_range(len(components)):
-        path = prefix + "/".join(condensed)
+        path = prefix + "/".join(condensed) + "/"
         if cell_len(path) < width:
             break
         condensed = [*components[:left], "…", *components[right:]]
