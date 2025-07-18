@@ -19,8 +19,27 @@ Conversation {
             height: auto;
         }  
     }
+    # Markdown {
+    #     padding-left: 1;
+        
+    # }
     #contents > * {
-        margin: 1 0 0 0;        
+        margin: 1 0 0 0; 
+        & > MarkdownBlock {            
+            &.-cursor {
+                
+                outline-left: outer $block-cursor-background;
+                
+            }
+        }
+        & > MarkdownBlock:last-child {
+            margin-bottom: 0;     
+        }
+    }
+    
+    
+    Markdown {
+       
     }
 }
 
@@ -30,7 +49,7 @@ Welcome {
     min-height: 100%;
     
     #logo {
-        color: $success;        
+        color: $text-success;        
     }
     & > #message {
         width: 1fr;
