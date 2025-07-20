@@ -1,5 +1,6 @@
 from textual.widgets import Markdown
 from textual.widgets._markdown import MarkdownBlock
+from textual.content import Content
 
 
 class ConversationCodeFence(Markdown.BLOCKS["code_fence"]):

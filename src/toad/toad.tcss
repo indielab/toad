@@ -12,7 +12,7 @@ Conversation {
     height: 1fr;
     max-width: 100;    
     background: black 10%;
-    layers: base prompt;
+    layers: float base prompt;
     # Prompt {
         
     #     dock: bottom;
@@ -98,4 +98,22 @@ MainScreen {
     # hatch: right $foreground 10%;
     align: center top;
     background: $background;
+}
+
+Explain {
+    # layer: float;    
+    padding: 0;    
+    & > Markdown {        
+        margin: 1;
+        height: auto;
+        min-height: 1fr;
+        width: 100%;        
+
+    }
+    dock: left;
+    border: tab $primary;
+    height: 1fr;
+    display: none;  
+    overflow: auto;
+    width: 40%;    
 }

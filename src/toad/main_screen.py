@@ -6,6 +6,7 @@ from textual import getters
 
 from toad.widgets.throbber import Throbber
 from toad.widgets.conversation import Conversation
+from toad.widgets.explain import Explain
 
 
 class MainScreen(Screen):
@@ -15,6 +16,7 @@ class MainScreen(Screen):
     conversation = getters.query_one(Conversation)
 
     def compose(self) -> ComposeResult:
+        yield Explain()
         yield Conversation()
 
     def action_focus_prompt(self) -> None:

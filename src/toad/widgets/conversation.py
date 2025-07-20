@@ -1,5 +1,6 @@
+import asyncio
 from contextlib import suppress
-from textual import on
+from textual import on, work
 from textual.app import ComposeResult
 from textual import containers
 from textual import getters
@@ -12,7 +13,6 @@ from textual.geometry import Offset
 from textual.reactive import var
 from textual.css.query import NoMatches
 
-from textual._profile import timer
 
 from toad import messages
 from toad.widgets.menu import Menu
@@ -21,6 +21,8 @@ from toad.widgets.throbber import Throbber
 from toad.widgets.welcome import Welcome
 from toad.widgets.user_input import UserInput
 from toad.widgets.agent_response import AgentResponse
+from toad.widgets.explain import Explain
+
 from toad.menus import CONVERSATION_MENUS
 
 MD = """\
@@ -306,12 +308,17 @@ class Conversation(containers.Vertical):
     def watch_busy_count(self, busy: int) -> None:
         self.throbber.set_class(busy > 0, "-busy")
 
+    @work
     async def on_mount(self) -> None:
+        self.screen.can_focus = False
         await self.post(Welcome(), anchor=True)
         # agent_response = AgentResponse()
         # await self.post(agent_response, anchor=True)
-        # await agent_response.update(MD)
-        self.screen.can_focus = False
+        # chunk = 8
+
+        # for position in range(0, len(MD), chunk):
+        #     await agent_response.append(MD[position : position + chunk])
+        #     await asyncio.sleep(0.0)
 
     async def on_click(self, event: events.Click) -> None:
         if event.widget is not None:
@@ -386,7 +393,18 @@ class Conversation(containers.Vertical):
         if block.name is None:
             self.app.bell()
             return
-        menu_options = CONVERSATION_MENUS.get(block.name, [])
+        menu_options = CONVERSATION_MENUS.get(block.name, []).copy()
+
+        from toad.code_analyze import get_special_name_from_code
+
+        if block.name == "fence":
+            for numeral, name in enumerate(
+                get_special_name_from_code(block._content.plain, block._token.info), 1
+            ):
+                menu_options.append(
+                    Menu.Item(f"explain('{name}')", f"Explain '{name}'", f"{numeral}")
+                )
+
         menu = Menu(
             [
                 Menu.Item("explain", "Explain this", "e"),
@@ -407,6 +425,14 @@ class Conversation(containers.Vertical):
         if (block := self.cursor_block) is not None and block.source:
             self.block_cursor = -1
             self.prompt.append(block.source)
+
+    def action_explain(self, topic: str | None = None) -> None:
+        if (block := self.cursor_block) is not None and block.source:
+            if topic:
+                PROMPT = f"Explain the purpose of '{topic}' in the following code:\n{block.source}"
+            else:
+                PROMPT = f"Explain the following:\n{block.source}"
+            self.screen.query_one(Explain).send_prompt(PROMPT)
 
     def watch_block_cursor(self, block_cursor: int) -> None:
         if block_cursor == -1:
