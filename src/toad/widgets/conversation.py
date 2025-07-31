@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cached_property
 from typing import TYPE_CHECKING
 import asyncio
 from contextlib import suppress
@@ -305,8 +306,6 @@ class Conversation(containers.Vertical):
     contents = getters.query_one("#contents", containers.VerticalScroll)
     cursor = getters.query_one(Cursor)
     prompt = getters.query_one(Prompt)
-    llm_model = var(lambda: llm.get_model("gpt-4o"))
-    conversation = var(lambda: llm.get_model("gpt-4o").conversation())
 
     app: ToadApp
 
@@ -315,6 +314,10 @@ class Conversation(containers.Vertical):
         with Contents(id="contents"):
             yield Cursor()
         yield Prompt()
+
+    @cached_property
+    def conversation(self) -> llm.Conversation:
+        return llm.get_model(self.app.settings.get("llm.model", str)).conversation()
 
     @property
     def cursor_block(self) -> MarkdownBlock | None:
@@ -366,6 +369,13 @@ class Conversation(containers.Vertical):
 
     async def on_mount(self) -> None:
         self.call_after_refresh(self.post_welcome)
+        self.app.settings_changed_signal.subscribe(self, self._settings_changed)
+
+    def _settings_changed(self, setting_item: tuple[str, str]) -> None:
+        key, value = setting_item
+        if key == "llm.model":
+            self.conversation = llm.get_model(value).conversation()
+            self.notify(f"Updated LLM model to {value!r}", title="llm.model")
 
     async def post_welcome(self) -> None:
         from toad.widgets.welcome import Welcome
