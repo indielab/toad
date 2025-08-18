@@ -56,11 +56,12 @@ class ANSILog(ScrollView, can_focus=True):
         minimum_terminal_width: int = -1,
     ):
         self.line_start = 0
-        self.cursor_line = 0
-        self.cursor_offset = 0
         self.minimum_terminal_width = minimum_terminal_width
 
-        self._line_count = 0
+        self.cursor_line = 0
+        """folded line index."""
+        self.cursor_offset = 0
+        """folded line offset"""
 
         # Sequence of lines
         self._lines: list[LineRecord] = []
@@ -88,24 +89,25 @@ class ANSILog(ScrollView, can_focus=True):
 
     @property
     def line_count(self) -> int:
-        return self._line_count
+        return len(self._lines)
 
     @property
     def last_line_index(self) -> int:
-        return self._line_count - 1
+        return self.line_count - 1
 
     @property
     def cursor_line_offset(self) -> int:
         """The cursor offset within the un-folded lines."""
         cursor_folded_line = self._folded_lines[self.cursor_line]
+        cursor_line_offset = cursor_folded_line.line_offset
         line_no = cursor_folded_line.line_no
         line = self._lines[line_no]
         position = 0
-        for folded_line in line.folds:
-            if folded_line is cursor_folded_line:
+        for folded_line_offset, folded_line in enumerate(line.folds):
+            if folded_line_offset == cursor_line_offset:
                 position += self.cursor_offset
                 break
-            position += len(folded_line)
+            position += len(folded_line.content)
         return position
 
     def on_mount(self):
@@ -150,6 +152,7 @@ class ANSILog(ScrollView, can_focus=True):
         folded_lines = self._folded_lines
 
         for ansi_token in self._ansi_stream.feed(text):
+            self.log(ansi_token)
             (
                 delta_x,
                 delta_y,
@@ -161,7 +164,7 @@ class ANSILog(ScrollView, can_focus=True):
             while self.cursor_line >= len(folded_lines):
                 self.add_line(Content())
 
-            folded_line = self._folded_lines[self.cursor_line]
+            folded_line = folded_lines[self.cursor_line]
             line = self._lines[folded_line.line_no]
 
             if content is not None:
@@ -177,30 +180,28 @@ class ANSILog(ScrollView, can_focus=True):
                         line.content[end_replace + 1 :],
                     )
                 else:
-                    if cursor_line_offset == len(line.content) + 1:
-                        updated_line = content
-                    else:
-                        updated_line = Content.assemble(
-                            line.content[:cursor_line_offset],
-                            content,
-                            line.content[cursor_line_offset + len(content) :],
-                        )
+                    print("*", cursor_line_offset)
+                    updated_line = Content.assemble(
+                        line.content[:cursor_line_offset],
+                        content,
+                        line.content[cursor_line_offset + len(content) :],
+                    )
 
-                self.update_line(self.cursor_line, updated_line)
-
-            folded_line = self._folded_lines[self.cursor_line]
+                self.update_line(folded_line.line_no, updated_line)
 
             if delta_x is not None:
-                self.cursor_offset = clamp(
-                    self.cursor_offset + delta_x, 0, len(folded_line.content)
-                )
+                self.cursor_offset += delta_x
+                while self.cursor_offset >= self._width:
+                    self.cursor_line += 1
+                    self.cursor_offset -= self._width
             if delta_y is not None:
                 self.cursor_line = max(0, self.cursor_line + delta_y)
 
             if absolute_x is not None:
-                self.cursor_offset = clamp(absolute_x, 0, len(folded_line.content))
+                self.cursor_offset = absolute_x
             if absolute_y is not None:
                 self.cursor_line = max(0, absolute_y)
+            print(self.cursor_line, self.cursor_offset)
 
     def _fold_line(self, line_no: int, line: Content, width: int) -> list[LineFold]:
         if not width:
@@ -233,31 +234,25 @@ class ANSILog(ScrollView, can_focus=True):
         self.virtual_size = Size(width, len(self._folded_lines))
 
     def add_line(self, content: Content) -> None:
-        line_no = self._line_count
-        self._line_count += 1
+        print("add_line", self.line_count)
+        line_no = self.line_count
         width = self._width
         line_record = LineRecord(content, self._fold_line(line_no, content, width))
         self._lines.append(line_record)
-        if not width:
-            return
+        # if not width:
+        #     return
         folds = line_record.folds
         self._line_to_fold.append(len(self._folded_lines))
         self._folded_lines.extend(folds)
+        print(self._line_to_fold)
+        print(len(self._folded_lines))
 
         self.virtual_size = Size(width, len(self._folded_lines))
 
     def update_line(self, line_index: int, line: Content) -> None:
         line.simplify()
         while line_index >= len(self._lines):
-            empty_line = Content()
-            self._lines.append(
-                LineRecord(
-                    empty_line,
-                    folds=self._fold_line(
-                        len(self._lines) + 1, empty_line, self._width
-                    ),
-                )
-            )
+            self.add_line(Content())
 
         line_record = self._lines[line_index]
         line_record.content = line
@@ -360,7 +355,9 @@ if __name__ == "__main__":
             env["FORCE_COLOR"] = "1"
 
             process = await asyncio.create_subprocess_shell(
-                "python -m rich.progress",
+                # "python -m rich.progress",
+                # "python ansi_mandel.py",
+                "python simple_test.py",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,

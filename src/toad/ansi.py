@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import rich.repr
+
 import re
 from dataclasses import dataclass
 from functools import lru_cache
@@ -475,6 +477,7 @@ ANSI_COLORS: Sequence[str] = [
 ]
 
 
+@rich.repr.auto
 class ANSISegment(NamedTuple):
     delta_x: int | None = None
     delta_y: int | None = None
@@ -482,6 +485,14 @@ class ANSISegment(NamedTuple):
     absolute_y: int | None = None
     content: Content | None = None
     replace: tuple[int | None, int | None] | None = None
+
+    def __rich_repr__(self) -> rich.repr.Result:
+        yield "delta_x", self.delta_x, None
+        yield "delta_y", self.delta_y, None
+        yield "absolute_x", self.absolute_x, None
+        yield "absolute_y", self.absolute_y, None
+        yield "content", self.content, None
+        yield "replace", self.replace, None
 
     def get_replace_offsets(
         self, cursor_offset: int, line_length: int
@@ -634,26 +645,26 @@ if __name__ == "__main__":
 
     from rich import print
 
+    # content = Content.from_markup(
+    #     "Hello\n[bold magenta]World[/]!\n[ansi_red]This is [i]red\nVisit [link='https://www.willmcgugan.com']My blog[/]."
+    # )
     content = Content.from_markup(
-        "Hello\n[bold magenta]World[/]!\n[ansi_red]This is [i]red\nVisit [link='https://www.willmcgugan.com']My blog[/]."
+        "[red]012345678901234567890123455678901234567789[/red] " * 2
     )
     # content = Content.from_markup("[link='https://www.willmcgugan.com']My blog[/].")
     ansi_text = "".join(
         segment.style.render(segment.text) if segment.style else segment.text
         for segment in content.render_segments()
     )
-    print(content)
-    print(repr(ansi_text))
+    # print(content)
+    # print(repr(ansi_text))
 
     parser = ANSIStream()
     from itertools import batched
 
-    for batch in batched(ansi_text, 2):
-        token = parser.feed("".join(batch))
+    for batch in batched(ansi_text, 1000):
+        for ansi_segment in parser.feed("".join(batch)):
+            print(repr(ansi_segment))
 
-    print(parser.lines)
-    print(parser)
-
-    print(parser.lines)
     # for line in parser.lines:
     #     print(line)
