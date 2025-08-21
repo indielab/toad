@@ -33,23 +33,16 @@ class Shell:
         self.shell = os.environ.get("SHELL", "sh")
         self.master = 0
         self._task: asyncio.Task | None = None
+        self.width = 80
+        self.height = 24
 
     async def send(self, command: str, width: int, height: int) -> None:
-        # ansi_log = self.ansi_log = await self.conversation.get_ansi_log()
-        # width = ansi_log.scrollable_content_region.width
-        # assert isinstance(ansi_log.parent, Widget)
-        # height = (
-        #     ansi_log.query_ancestor("Window", Widget).scrollable_content_region.height
-        #     - ansi_log.parent.gutter.height
-        #     - ansi_log.styles.margin.height
-        # )
-        # if height < 24:
-        #     height = 24
-
-        self.ansi_log = None
+        self.width = width
+        self.height = height
         resize_pty(self.master, width, height)
         command = f"{command}\n"
         self.writer.write(command.encode("utf-8"))
+        self.ansi_log = None
 
     def start(self) -> None:
         self._task = asyncio.create_task(self.run())
@@ -71,7 +64,14 @@ class Shell:
         termios.tcsetattr(slave, termios.TCSANOW, attrs)
 
         env = os.environ.copy()
+        env["FORCE_COLOR"] = "1"
+        env["TTY_COMPATIBLE"] = "1"
+        env["TERM"] = "xterm-256color"
+        env["COLORTERM"] = "truecolor"
+        env["TOAD"] = "1"
+
         shell = f"{self.shell} +o interactive"
+
         process = await asyncio.create_subprocess_shell(
             shell,
             stdin=slave,
@@ -98,12 +98,15 @@ class Shell:
         )
         self.writer = write_transport
 
+        # self.writer.write("")
+
         unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         try:
-            while data := await reader.read(1024 * 16):
+            while data := await reader.read(1024 * 64):
                 line = unicode_decoder.decode(data)
                 if self.ansi_log is None:
-                    self.ansi_log = await self.conversation.get_ansi_log()
+                    self.ansi_log = await self.conversation.get_ansi_log(self.width)
+
                 self.ansi_log.write(line)
         finally:
             transport.close()

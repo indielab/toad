@@ -460,7 +460,7 @@ class Conversation(containers.Vertical):
     async def on_user_input_submitted(self, event: messages.UserInputSubmitted) -> None:
         if event.shell:
             await self.post_shell(event.body)
-        else:
+        elif event.body.strip():
             from toad.widgets.agent_response import AgentResponse
 
             await self.post(UserInput(event.body))
@@ -571,20 +571,21 @@ class Conversation(containers.Vertical):
             self.window.anchor()
         return widget
 
-    async def get_ansi_log(self) -> ANSILog:
+    async def get_ansi_log(self, width: int) -> ANSILog:
         from toad.widgets.ansi_log import ANSILog
 
         if self.children and isinstance(self.children[-1], ANSILog):
             ansi_log = self.children[-1]
         else:
-            ansi_log = await self.post(ANSILog())
+            ansi_log = await self.post(ANSILog(minimum_terminal_width=width))
             await ansi_log.wait_for_refresh()
         return ansi_log
 
     async def post_shell(self, command: str) -> None:
         from toad.widgets.shell_result import ShellResult
 
-        await self.post(ShellResult(command))
+        if command.strip():
+            await self.post(ShellResult(command))
         self.call_after_refresh(
             self.shell.send,
             command,

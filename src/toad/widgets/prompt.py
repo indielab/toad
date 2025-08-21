@@ -136,7 +136,7 @@ class Prompt(containers.VerticalGroup):
 
     def update_prompt(self):
         if self.shell_mode:
-            self.prompt_label.update(self.PROMPT_SHELL)
+            self.prompt_label.update(self.PROMPT_SHELL, layout=False)
             self.add_class("-shell-mode")
             self.prompt_text_area.placeholder = Content.assemble(
                 "Enter shell command".expandtabs(8),
@@ -144,7 +144,8 @@ class Prompt(containers.VerticalGroup):
             self.prompt_text_area.highlight_language = "shell"
         else:
             self.prompt_label.update(
-                self.PROMPT_MULTILINE if self.multi_line else self.PROMPT_AI
+                self.PROMPT_MULTILINE if self.multi_line else self.PROMPT_AI,
+                layout=False,
             )
             self.remove_class("-shell-mode")
             self.prompt_text_area.placeholder = Content.assemble(
@@ -172,6 +173,10 @@ class Prompt(containers.VerticalGroup):
             "cp",
             "tree",
             "rm",
+            "echo",
+            "rmdir",
+            "mkdir",
+            "touch",
         ):
             return True
         return False
@@ -232,6 +237,7 @@ class Prompt(containers.VerticalGroup):
         event.stop()
 
     def update_auto_complete_location(self):
+        return
         cursor_offset = self.prompt_text_area.cursor_screen_offset + (-2, 1)
         self.auto_complete.styles.offset = cursor_offset
 

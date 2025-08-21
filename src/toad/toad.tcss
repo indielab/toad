@@ -17,7 +17,7 @@ Conversation {
     
     Window {
         margin-right: 1;        
-        scrollbar-gutter: stable;
+        # scrollbar-gutter: stable;
         scrollbar-size-vertical: 2;
     }
 
