@@ -557,7 +557,7 @@ class Conversation(containers.Vertical):
         # await self.post(Welcome(classes="note", name="welcome"), anchor=False)
         await self.post(
             Note(f"Settings read from [$text-success]'{self.app.settings_path}'"),
-            anchor=False,
+            anchor=True,
         )
         notes_path = Path(__file__).parent / "../../../notes.md"
         from toad.widgets.markdown_note import MarkdownNote

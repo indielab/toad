@@ -26,6 +26,8 @@ Note,MarkdownNote {
 
 Conversation {
     
+ 
+
     Window {
         margin: 0;        
         # scrollbar-gutter: stable;
@@ -76,7 +78,8 @@ Conversation {
         }   
         & > MarkdownBlock:last-child {                        
             margin-bottom: 0;     
-        }          
+        }  
+            
     }
 
     ContentsGrid {
