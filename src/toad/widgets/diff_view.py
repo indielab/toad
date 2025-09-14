@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 
+import asyncio
 import difflib
 
 from rich.segment import Segment
@@ -66,7 +67,7 @@ class GroupHeading(Static):
 class LineContent(Visual):
     def __init__(
         self,
-        code_lines: list[Content],
+        code_lines: list[Content | None],
         line_styles: list[str],
         width: int | None = None,
     ) -> None:
@@ -95,15 +96,12 @@ class LineContent(Visual):
                     line = line.pad_right(width - line.cell_length)
 
             line = line.stylize_before(color).stylize_before(style)
-
-            # TODO: rich_style_with_offsets needed to make content selectable
-
             x = 0
-            meta = {"offset": (0, 0)}
+            meta = {"offset": (x, y)}
             segments = []
             for text, rich_style, _ in line.render_segments():
-                meta["offset"] = (x, y)
                 if rich_style is not None:
+                    meta["offset"] = (x, y)
                     segments.append(
                         Segment(text, rich_style + RichStyle.from_meta(meta))
                     )
@@ -117,7 +115,7 @@ class LineContent(Visual):
     def get_optimal_width(self, rules: RulesMap, container_width: int) -> int:
         if self._width is not None:
             return self._width
-        return max(line.cell_length for line in self.code_lines)
+        return max(line.cell_length for line in self.code_lines if line is not None)
 
     def get_minimal_width(self, rules: RulesMap) -> int:
         return 1
@@ -127,6 +125,8 @@ class LineContent(Visual):
 
 
 class LineAnnotations(Widget):
+    """A vertical strip next to the code, containing line numbers or symbols."""
+
     DEFAULT_CSS = """
     LineAnnotations {
         width: auto;
@@ -134,29 +134,22 @@ class LineAnnotations(Widget):
     }
     """
     numbers: reactive[list[Content]] = reactive(list)
-    left_pad: reactive[int] = reactive(0)
-    right_pad: reactive[int] = reactive(0)
 
     def __init__(
         self,
         numbers: list[Content],
         *,
-        left_pad=0,
-        right_pad=0,
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
         disabled: bool = False,
     ):
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
-
-        self.set_reactive(LineAnnotations.left_pad, left_pad)
-        self.set_reactive(LineAnnotations.right_pad, right_pad)
         self.numbers = numbers
 
     @property
     def total_width(self) -> int:
-        return self.left_pad + self.number_width + self.right_pad
+        return self.number_width
 
     def get_content_width(self, container: Size, viewport: Size) -> int:
         return self.total_width
@@ -166,11 +159,7 @@ class LineAnnotations(Widget):
 
     @property
     def number_width(self) -> int:
-        numbers = self.numbers
-        if numbers:
-            return max(number.cell_length for number in numbers)
-        else:
-            return 0
+        return max(number.cell_length for number in self.numbers) if self.numbers else 0
 
     def render_line(self, y: int) -> Strip:
         width = self.total_width
@@ -182,19 +171,15 @@ class LineAnnotations(Widget):
             number = Content.empty()
 
         strip = Strip(
-            line_pad(
-                number.render_segments(visual_style),
-                self.left_pad,
-                self.right_pad,
-                rich_style,
-            ),
-            cell_length=number.cell_length + self.left_pad + self.right_pad,
+            number.render_segments(visual_style), cell_length=number.cell_length
         )
         strip = strip.adjust_cell_length(width, rich_style)
         return strip
 
 
 class DiffCode(Static):
+    """Container for the code."""
+
     DEFAULT_CSS = """
     DiffCode {
         width: auto;        
@@ -223,6 +208,8 @@ def fill_lists[T](list_a: list[T], list_b: list[T], fill_value: T) -> None:
 
 
 class DiffView(containers.VerticalGroup):
+    """A formatted diff in unified or split format."""
+
     code_before: reactive[str] = reactive("")
     code_after: reactive[str] = reactive("")
     path1: reactive[str] = reactive("")
@@ -285,6 +272,21 @@ class DiffView(containers.VerticalGroup):
         self.set_reactive(DiffView.code_after, code_after)
         self._grouped_opcodes: list[list[tuple[str, int, int, int, int]]] | None = None
         self._highlighted_code_lines: tuple[list[Content], list[Content]] | None = None
+
+    async def prepare(self) -> None:
+        """Do CPU work in a thread.
+
+        Call this method prior to composing or mounting to ensure lazy calculated
+        data structures run in a thread. Otherwise the work will be done in the async
+        loop, potentially causing a brief freeze.
+
+        """
+
+        def prepare() -> None:
+            self.grouped_opcodes
+            self.highlighted_code_lines
+
+        await asyncio.to_thread(prepare)
 
     @property
     def grouped_opcodes(self) -> list[list[tuple[str, int, int, int, int]]]:
@@ -359,7 +361,6 @@ class DiffView(containers.VerticalGroup):
                 split_width += 3 * 2
             else:
                 split_width += 2
-
             self.split = event.size.width >= split_width
 
     def compose_unified(self) -> ComposeResult:
@@ -369,15 +370,13 @@ class DiffView(containers.VerticalGroup):
             line_numbers_a: list[int | None] = []
             line_numbers_b: list[int | None] = []
             annotations: list[str] = []
-            code_lines: list[Content] = []
+            code_lines: list[Content | None] = []
             first, last = group[0], group[-1]
             file1_range = _format_range_unified(first[1], last[2])
             file2_range = _format_range_unified(first[3], last[4])
             yield GroupHeading(
-                Content.from_markup(
-                    "@@ [$text-error]-{}[/] [$text-success]+{}[/] @@".format(
-                        file1_range, file2_range
-                    ),
+                "@@ [$text-error]-{}[/] [$text-success]+{}[/] @@".format(
+                    file1_range, file2_range
                 )
             )
             for tag, i1, i2, j1, j2 in group:
@@ -455,10 +454,8 @@ class DiffView(containers.VerticalGroup):
             file1_range = _format_range_unified(first[1], last[2])
             file2_range = _format_range_unified(first[3], last[4])
             yield GroupHeading(
-                Content.from_markup(
-                    "@@ [$text-error]-{}[/] [$text-success]+{}[/] @@".format(
-                        file1_range, file2_range
-                    ),
+                "@@ [$text-error]-{}[/] [$text-success]+{}[/] @@".format(
+                    file1_range, file2_range
                 )
             )
             line_numbers_a: list[int | None] = []
