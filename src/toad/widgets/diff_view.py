@@ -239,12 +239,7 @@ class DiffView(containers.VerticalGroup):
     DiffView {
         width: 1fr;
         height: auto;
-        # &:dark {
-        #     background: black 20%;
-        # }   
-        # &:dark {
-        #     # background: $foreground 10%;
-        # }       
+        
         .diff-group {
             height: auto;
             background: $foreground 4%;

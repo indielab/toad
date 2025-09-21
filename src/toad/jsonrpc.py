@@ -30,7 +30,7 @@ def expose(name: str = "", prefix: str = ""):
     """Expose a method."""
 
     def expose_method[T: Callable](callable: T) -> T:
-        callable._jsonrpc_expose = f"{prefix}{name or callable.__name__}"
+        setattr(callable, "_jsonrpc_expose", f"{prefix}{name or callable.__name__}")
         return callable
 
     return expose_method
@@ -167,6 +167,16 @@ class Server:
     async def _dispatch_object_call(
         self, request_id: int | str | None, json: JSONObject
     ) -> JSONType | None:
+        """Dispatch a JSONRPC call.
+
+        Args:
+            request_id: The request ID.
+            json: JSON object with the remote call information.
+
+        Returns:
+            Result encoding in a JSONRPC result object, or `None` if the call is a notification
+                and doesn't require a result.
+        """
         if (jsonrpc := json.get("jsonrpc")) != "2.0":
             raise InvalidRequest(
                 f"jsonrpc attribute should be '2.0'; found {jsonrpc!r}", id=request_id
@@ -183,7 +193,8 @@ class Server:
 
         if (method := self._methods.get(method_name)) is None:
             raise MethodNotFound(
-                f"Method not found; {method!r} is not an exposed method", id=request_id
+                f"Method not found; {method_name!r} is not an exposed method",
+                id=request_id,
             )
 
         no_params: JSONList = []
@@ -252,7 +263,8 @@ class Server:
             return None
 
         response_object = {"jsonrpc": "2.0", "result": result, "id": request_id}
-        log.debug(response_object)
+        print("JSONRPC response")
+        print(response_object)
         return response_object
 
     async def _dispatch_batch(self, json: JSONList) -> list[JSONType]:
@@ -347,7 +359,7 @@ class MethodCall[ReturnType]:
             }
         return json
 
-    async def wait(self, timeout: float | None = None) -> ReturnType:
+    async def wait(self, timeout: float | None = None) -> ReturnType | None:
         if self.id is None:
             return None
         async with asyncio.timeout(timeout):
@@ -434,6 +446,7 @@ class API:
                                 APIError(code, message, data)
                             )
                 else:
+                    print("RESULT", result)
                     method_call.future.set_result(result)
 
     def process_response(self, response: JSONType) -> None:

@@ -120,22 +120,28 @@ class Agent(AgentBase):
         print("REQUEST PERMISSION")
         # if (message_target := self._message_target) is None:
         #     return
+        from toad.widgets.question import Answer
+
         assert self._message_target is not None
-        result_future: asyncio.Future[tuple[str, str]] = asyncio.Future()
+        result_future: asyncio.Future[Answer] = asyncio.Future()
         self._message_target.post_message(
-            messages.ACPRequestPermission(options, toolCall, result_future)
+            messages.ACPRequestPermission(
+                options,
+                toolCall,
+                result_future,
+            )
         )
         await result_future
-        result = result_future.result()
-        outcome, option_id = result
-        return {
-            "outcome": {
-                "selected": {
-                    "outcome": outcome,
-                    "optionId": option_id,
-                },
-            },
+        ask_result = result_future.result()
+
+        request_permission_outcome: protocol.OutcomeSelected = {
+            "optionId": ask_result.id,
+            "outcome": "selected",
         }
+        result: protocol.RequestPermissionResponse = {
+            "outcome": request_permission_outcome
+        }
+        return result
 
     @jsonrpc.expose("fs/read_text_file")
     def rpc_read_text_file(

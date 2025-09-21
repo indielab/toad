@@ -306,8 +306,7 @@ Prompt {
     padding: 0 0 0 0;
     # max-height: 50%;
     # background: $background;
-    height: auto;
-
+    height: auto;    
    
     &.-shell-mode {
         #prompt-container:focus-within {
@@ -366,7 +365,7 @@ Prompt {
         border-subtitle-style: reverse;
         
         &:focus-within {
-            border: tall $secondary;
+            border: tall $secondary;            
             #prompt {
                 text-opacity: 100%;
             }

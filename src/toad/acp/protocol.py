@@ -139,9 +139,10 @@ class ToolCallContentContent(SchemaDict, total=False):
     type: Required[str]
 
 
+# https://agentclientprotocol.com/protocol/schema#param-diff
 class ToolCallContentDiff(SchemaDict, total=False):
     newText: Required[str]
-    oldText: str
+    oldText: str | None
     path: Required[str]
     type: Required[str]
 
@@ -196,7 +197,7 @@ class ToolCall(SchemaDict, total=False):
 # https://agentclientprotocol.com/protocol/schema#toolcallupdate
 class ToolCallUpdate(SchemaDict, total=False):
     _meta: dict
-    content: list | None
+    content: list[ToolCallContent] | None
     kind: ToolKind | None
     locations: list | None
     rawInput: dict
@@ -269,19 +270,16 @@ class PermissionOption(TypedDict, total=False):
 
 
 class OutcomeCancelled(TypedDict, total=False):
-    outcome: Required[str]
+    outcome: Literal["cancelled"]
 
 
 class OutcomeSelected(TypedDict, total=False):
     optionId: Required[PermissionOptionId]
-    outcome: Required[str]
+    outcome: Literal["selected"]
 
 
 # https://agentclientprotocol.com/protocol/schema#requestpermissionoutcome
-class RequestPermissionOutcome(TypedDict, total=False):
-    cancelled: OutcomeCancelled
-    selected: OutcomeSelected
-
+type RequestPermissionOutcome = OutcomeSelected | OutcomeCancelled
 
 # ---------------------------------------------------------------------------------------
 # RPC responses

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from asyncio import Future
 from textual.message import Message
 
+from toad.widgets.question import Answer
 from toad.acp import protocol
 
 
@@ -26,4 +27,4 @@ class ACPUpdate(ACPAgentMessage):
 class ACPRequestPermission(ACPAgentMessage):
     options: list[protocol.PermissionOption]
     tool_call: protocol.ToolCallUpdate
-    result_future: Future[tuple[str, str]]
+    result_future: Future[Answer]

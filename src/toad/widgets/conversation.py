@@ -638,7 +638,8 @@ class Conversation(containers.Vertical):
     ) -> None:
         self.log("post_tool_call")
         self.log(tool_call_update)
-        if not isinstance((contents := tool_call_update.get("content", None)), list):
+
+        if (contents := tool_call_update.get("content")) is None:
             return
 
         for content in contents:
@@ -651,7 +652,7 @@ class Conversation(containers.Vertical):
                 }:
                     await self.post_diff(path, old_text, new_text)
 
-    async def post_diff(self, path: str, before: str, after: str) -> None:
+    async def post_diff(self, path: str, before: str | None, after: str) -> None:
         """Post a diff view.
 
         Args:
@@ -661,7 +662,7 @@ class Conversation(containers.Vertical):
         """
         from toad.widgets.diff_view import DiffView
 
-        diff_view = DiffView(path, path, before, after, classes="block")
+        diff_view = DiffView(path, path, before or "", after, classes="block")
         diff_view_setting = self.app.settings.get("diff.view", str)
         diff_view.split = diff_view_setting == "split"
         diff_view.auto_split = diff_view_setting == "auto"
