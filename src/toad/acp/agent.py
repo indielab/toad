@@ -16,6 +16,7 @@ from toad.acp import api
 from toad.acp.api import API
 from toad.acp import messages
 from toad.acp.prompt import build as build_prompt
+from toad import constants
 from toad.answer import Answer
 
 PROTOCOL_VERSION = 1
@@ -206,14 +207,19 @@ class Agent(AgentBase):
         agent_output = open("agent.jsonl", "wb")
 
         PIPE = asyncio.subprocess.PIPE
+        print("COMMAND", repr(self.command))
+        env = os.environ.copy()
+        env["TOAD_CWD"] = str(Path("./").absolute())
         process = self._process = await asyncio.create_subprocess_shell(
             self.command,
             stdin=PIPE,
             stdout=PIPE,
             stderr=PIPE,
-            env=os.environ,
+            env=env,
             cwd=str(self.project_root_path),
         )
+        print(process)
+        print(process.stdout)
 
         self._task = asyncio.create_task(self.run())
 
@@ -223,10 +229,8 @@ class Agent(AgentBase):
         tasks: set[asyncio.Task] = set()
 
         async def call_jsonrpc(request: jsonrpc.JSONObject | jsonrpc.JSONList) -> None:
-            print("calling", request)
             try:
                 result = await self.server.call(request)
-                print("result", result)
                 result_json = json.dumps(result).encode("utf-8")
                 if process.stdin is not None:
                     process.stdin.write(b"%s\n" % result_json)
@@ -238,9 +242,15 @@ class Agent(AgentBase):
             # This line should contain JSON, which may be:
             #   A) a JSONRPC request
             #   B) a JSONRPC response to a previous request
-            agent_output.writelines([line])
+            print("LINE", line)
+            if not line.strip():
+                continue
+
+            agent_output.write(b"%b\n" % line)
+            agent_output.flush()
+
             try:
-                agent_data = json.loads(line.decode("utf-8"))
+                agent_data: jsonrpc.JSONType = json.loads(line.decode("utf-8"))
                 log(agent_data)
             except Exception:
                 # TODO: handle this
@@ -255,23 +265,31 @@ class Agent(AgentBase):
                 if not all(isinstance(datum, dict) for datum in agent_data):
                     log.warning(f"Agent sent invalid data: {agent_data!r}")
                     continue
-                if all(("result" in datum or "error" in datum) for datum in agent_data):
+                if all(
+                    isinstance(datum, dict) and ("result" in datum or "error" in datum)
+                    for datum in agent_data
+                ):
                     API.process_response(agent_data)
                     continue
 
             # By this point we know it is a JSON RPC call
             print("JSONRPC CALL")
+            assert isinstance(agent_data, dict)
             log(agent_data)
             tasks.add(asyncio.create_task(call_jsonrpc(agent_data)))
 
+        print("AGENT RETURN", process.returncode)
+
+        agent_output.close()
         print("exit")
 
     async def run(self) -> None:
         """The main logic of the Agent."""
-        # Boilerplate to initialize comms
-        await self.acp_initialize()
-        # Create a new session
-        await self.acp_new_session()
+        if constants.ACP_INITIALIZE:
+            # Boilerplate to initialize comms
+            await self.acp_initialize()
+            # Create a new session
+            await self.acp_new_session()
 
     async def send_prompt(self, prompt: str) -> str | None:
         """Send a prompt to the agent.
@@ -302,7 +320,6 @@ class Agent(AgentBase):
             )
 
         response = await initialize_response.wait()
-        print(response)
         # Store agents capabilities
         if agent_capabilities := response.get("agentCapabilities"):
             self.agent_capabilities = agent_capabilities

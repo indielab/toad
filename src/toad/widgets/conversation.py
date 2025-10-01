@@ -865,7 +865,6 @@ class Conversation(containers.Vertical):
             ansi_log = ANSILog(minimum_terminal_width=width)
             ansi_log.display = display
             ansi_log = await self.post(ansi_log)
-            # await ansi_log.wait_for_refresh()
         return ansi_log
 
     async def post_shell(self, command: str) -> None:

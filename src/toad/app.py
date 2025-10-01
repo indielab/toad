@@ -43,7 +43,9 @@ class ToadApp(App):
     scrollbar: reactive[str] = reactive("normal")
 
     def __init__(
-        self, acp_command: str | None = None, project_dir: str | None = None
+        self,
+        acp_command: str | None = None,
+        project_dir: str | None = None,
     ) -> None:
         """
 

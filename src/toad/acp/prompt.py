@@ -26,7 +26,6 @@ def build(project_path: Path, prompt: str) -> list[protocol.ContentBlock]:
             raise
             # TODO: How should this be handled?
             continue
-        print(resource)
         uri = f"file://{resource.path.absolute().resolve()}"
         if resource.text is not None:
             prompt_content.append(
