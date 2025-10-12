@@ -8,6 +8,7 @@ from fractions import Fraction
 from rich.segment import Segment
 
 from textual.content import Content
+from textual.css.styles import RulesMap
 from textual.visual import Visual, RenderOptions
 from textual.strip import Strip
 from textual.style import Style
@@ -23,7 +24,14 @@ class Row(Visual):
     def render_strips(
         self, width: int, height: int | None, style: Style, options: RenderOptions
     ) -> list[Strip]:
-        return []
+        strips = self.columns.render(self.row_index, width, style)
+        return strips
+
+    def get_optimal_width(self, rules: RulesMap, container_width: int) -> int:
+        return self.columns.get_optimal_width()
+
+    def get_height(self, rules: RulesMap, width: int) -> int:
+        return self.columns.get_row_height(width, self.row_index)
 
 
 class Columns:
@@ -39,8 +47,34 @@ class Columns:
         self.gutter = gutter
         self.style = style
         self.rows: list[list[Content]] = []
+        self._last_render_parameters: tuple[int, Style] = (-1, Style())
+        self._last_render: list[list[Strip]] = []
+        self._optimal_width_cache: int | None = None
 
-        self.last_render_parameters: tuple[int, Style] = (-1, Style())
+    def __getitem__(self, row_index: int) -> Row:
+        if row_index < 0:
+            row_index = len(self.rows) - row_index
+        if row_index >= len(self.rows):
+            raise IndexError(f"No row with index {row_index}")
+        return Row(self, row_index)
+
+    def get_optimal_width(self) -> int:
+        if self._optimal_width_cache is not None:
+            return self._optimal_width_cache
+        gutter_width = (len(self.rows) - 1) * self.gutter
+        optimal_width = max(
+            sum(content.cell_length for content in row) + gutter_width
+            for row in self.rows
+        )
+        self._optimal_width_cache = optimal_width
+        return optimal_width
+
+    def get_row_height(self, width: int, row_index: int) -> int:
+        if not self._last_render:
+            row_strips = self._render(width, Style.null())
+        else:
+            row_strips = self._last_render
+        return len(row_strips[row_index])
 
     def add_row(self, *cells: Content | str) -> None:
         assert len(cells) == len(self.columns)
@@ -48,8 +82,20 @@ class Columns:
             cell if isinstance(cell, Content) else Content(cell) for cell in cells
         ]
         self.rows.append(new_cells)
+        self._optimal_width_cache = None
 
-    def _render(self, render_width: int, style: Style) -> list[Row]:
+    def render(
+        self, row_index: int, render_width: int, style: Style = Style.null()
+    ) -> list[Strip]:
+        cache_key = (render_width, style)
+        if self._last_render_parameters == cache_key:
+            row_strips = self._last_render
+        else:
+            row_strips = self._last_render = self._render(render_width, style)
+            self._last_render_parameters = cache_key
+        return row_strips[row_index]
+
+    def _render(self, render_width: int, style: Style) -> list[list[Strip]]:
         gutter_width = (len(self.columns) - 1) * self.gutter
         widths: list[int | None] = []
 
@@ -64,22 +110,27 @@ class Columns:
             if remaining_width <= 0:
                 widths = [width or 0 for width in widths]
             else:
+                remaining_width -= sum(width for width in widths if width is not None)
                 remaining_count = sum(1 for width in widths if width is None)
                 cell_width = remaining_width / remaining_count
 
-                distribute = map(
-                    int,
-                    accumulate(
-                        [cell_width] * remaining_count, operator.add, initial=cell_width
-                    ),
-                )
+                distribute: list[int] = []
+                previous_width = 0
+                total = Fraction(0)
+                for _ in range(remaining_count):
+                    total += cell_width
+                    distribute.append(int(total) - previous_width)
+                    previous_width = int(total)
+
                 iter_distribute = iter(distribute)
                 for index, column_width in enumerate(widths.copy()):
                     if column_width is None:
                         widths[index] = int(next(iter_distribute))
 
-        column_renders: list[list[list[Segment]]] = []
+        row_strips: list[list[Strip]] = []
+
         for row in self.rows:
+            column_renders: list[list[list[Segment]]] = []
             for content_width, content in zip(widths, row):
                 assert content_width is not None
                 segments = [
@@ -89,25 +140,26 @@ class Columns:
 
                 column_renders.append(segments)
 
-        height = max(len(lines) for lines in column_renders)
-        rich_style = style.rich_style
-        for width, lines in zip(widths, column_renders):
-            assert width is not None
-            while len(lines) < height:
-                lines.append([Segment(" " * width, rich_style)])
+            height = max(len(lines) for lines in column_renders)
+            rich_style = style.rich_style
+            for width, lines in zip(widths, column_renders):
+                assert width is not None
+                while len(lines) < height:
+                    lines.append([Segment(" " * width, rich_style)])
 
-        from rich import print
+            gutter = Segment(" " * self.gutter, rich_style)
+            strips: list[Strip] = []
+            for line_no in range(height):
+                strip_segments: list[Segment] = []
+                for last, column in loop_last(column_renders):
+                    strip_segments.extend(column[line_no])
+                    if not last and gutter:
+                        strip_segments.append(gutter)
+                strips.append(Strip(strip_segments, render_width))
 
-        gutter = Segment(" " * self.gutter, rich_style)
-        strips: list[Strip] = []
-        for line_no in range(height):
-            strip_segments: list[Segment] = []
-            for last, column in loop_last(column_renders):
-                strip_segments.extend(column[line_no])
-                if not last and gutter:
-                    strip_segments.append(gutter)
-            strips.append(Strip(strip_segments, render_width))
-        print(strips)
+            row_strips.append(strips)
+
+        return row_strips
 
 
 if __name__ == "__main__":
@@ -115,7 +167,14 @@ if __name__ == "__main__":
 
     traceback.install(show_locals=True)
 
+    from textual.app import App, ComposeResult
+    from textual.widgets import Static
+
     columns = Columns("auto", "flex")
-    columns.add_row("foo", "hello world" * 20)
-    print(columns.columns)
-    columns._render(30, Style())
+    columns.add_row("Foo", "Hello, World! " * 20)
+
+    class CApp(App):
+        def compose(self) -> ComposeResult:
+            yield Static(columns[0])
+
+    CApp().run()
