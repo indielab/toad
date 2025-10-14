@@ -214,17 +214,18 @@ Conversation {
     }
 
     Terminal {
-        height: auto;
-        border: panel $text-secondary;  
+        height: auto;   
+        border: panel $text-secondary 90%;          
         padding: 1 1 0 1;        
+        &.-success {
+            border: panel $text-success 90%;              
+        }
         &.-error {
-            border: panel $text-error;  
-        }
-        &.-released {
-                
-        }
+            border: panel $error-muted;              
+            border-title-color: $text-error;
+        }             
     }
-    
+         
     UserInput {
         border-left: blank $secondary;
         background: $secondary 15%;

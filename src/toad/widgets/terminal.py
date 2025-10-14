@@ -14,8 +14,10 @@ import sys
 import termios
 from typing import Mapping
 
+from textual.content import Content
 from textual.reactive import var
 
+from toad.pill import pill
 from toad.widgets.ansi_log import ANSILog
 
 
@@ -85,6 +87,7 @@ class Terminal(ANSILog):
         self._shell_fd: int | None = None
         self._return_code: int | None = None
         self._released: bool = False
+        self._ready_event = asyncio.Event()
         self._exit_event = asyncio.Event()
 
         self._width: int | None = None
@@ -124,13 +127,11 @@ class Terminal(ANSILog):
 
     async def wait_for_exit(self) -> tuple[int | None, str | None]:
         """Wait for the terminal process to exit."""
-        if self._process is None:
+        if self._process is None or self._task is None:
             return None, None
-        self.notify("waiting")
+        # await self._task
         await self._exit_event.wait()
-        self.notify(f"done {self.return_code}")
-        assert self.return_code is not None
-        return (self.return_code, None)
+        return (self.return_code or 0, None)
 
     def kill(self) -> bool:
         """Kill the terminal process.
@@ -156,21 +157,26 @@ class Terminal(ANSILog):
     def watch__command(self, command: Command) -> None:
         self.border_title = str(command)
 
-    def start(self, width: int = 0, height: int = 0) -> None:
+    async def start(self, width: int = 0, height: int = 0) -> None:
         assert self._command is not None
         self._width = width or 80
         self._height = height or 80
-        self._task = asyncio.create_task(self.run())
+        self._task = asyncio.create_task(self.run(), name=f"Terminal {self._command}")
+        await self._ready_event.wait()
 
     async def run(self) -> None:
         try:
             await self._run()
-        except Exception as error:
+        except Exception:
             from traceback import print_exc
 
             print_exc()
+        finally:
+            self._exit_event.set()
 
     async def _run(self) -> None:
+        self._task = asyncio.current_task()
+
         assert self._command is not None
         master, slave = pty.openpty()
         self._shell_fd = master
@@ -188,9 +194,6 @@ class Terminal(ANSILog):
         termios.tcsetattr(slave, termios.TCSANOW, attrs)
 
         command = self._command
-
-        run_command, *args = shlex.split(command.command.strip("'"))
-        process_args = [*args, *command.args]
         environment = os.environ | command.env
 
         if " " in command.command:
@@ -212,10 +215,17 @@ class Terminal(ANSILog):
                 cwd=command.cwd,
             )
         except Exception as error:
+            self._ready_event.set()
             print(error)
             raise
 
-        self.resize_pty(master, self._width or 80, self._height or 24)
+        self._ready_event.set()
+
+        self.resize_pty(
+            master,
+            self._width or 80,
+            self._height or 24,
+        )
 
         os.close(slave)
         BUFFER_SIZE = 64 * 1024 * 2
@@ -234,16 +244,12 @@ class Terminal(ANSILog):
         )
         self.writer = write_transport
 
-        # self.writer.write(f"{run_command}\n".encode("utf-8"))
-
         unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         try:
             while True:
                 data = await reader.read(BUFFER_SIZE)
-                print(repr(data))
                 if process_data := unicode_decoder.decode(data, final=not data):
                     self._record_output(data)
-                    print(repr(process_data))
                     if self.write(process_data):
                         self.display = True
                 if not data:
@@ -251,9 +257,17 @@ class Terminal(ANSILog):
         finally:
             transport.close()
 
-        await process.wait()
-        self._return_code = process.returncode
-        self._exit_event.set()
+        print(self, "waiting for process")
+        return_code = self._return_code = await process.wait()
+        print("Process returned")
+        print("return code", return_code)
+        if return_code == 0:
+            print("SUCCESS")
+            self.add_class("-success")
+        else:
+            print("FAIL")
+            self.add_class("-error")
+            self.border_title = f"[{return_code}] {command}"
 
     def _record_output(self, data: bytes) -> None:
         """Keep a record of the bytes left.
@@ -321,6 +335,12 @@ if __name__ == "__main__":
     command = Command("python", ["mandelbrot.py"], os.environ.copy(), os.curdir)
 
     class TApp(App):
+        CSS = """
+        Terminal.-success  {
+            border: panel $text-success 90%;
+        }
+        """
+
         def compose(self) -> ComposeResult:
             yield Terminal(command)
 

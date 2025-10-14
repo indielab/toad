@@ -166,7 +166,7 @@ class Server:
                 "id": request_id,
                 "error": {
                     "code": int(ErrorCode.INTERNAL_ERROR),
-                    "message": f"An error occurred handling your request: {error:!r}",
+                    "message": f"An error occurred handling your request: {error!r}",
                 },
             }
 

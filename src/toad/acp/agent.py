@@ -247,7 +247,7 @@ class Agent(AgentBase):
 
     # https://agentclientprotocol.com/protocol/schema#createterminalrequest
     @jsonrpc.expose("terminal/create")
-    def rpc_terminal_create(
+    async def rpc_terminal_create(
         self,
         command: str,
         _meta: dict | None = None,
@@ -264,7 +264,7 @@ class Agent(AgentBase):
         terminal_env = (
             {variable["name"]: variable["value"] for variable in env} if env else {}
         )
-
+        result_future: asyncio.Future[bool] = asyncio.Future()
         self.post_message(
             messages.CreateTerminal(
                 terminal_id,
@@ -273,8 +273,12 @@ class Agent(AgentBase):
                 cwd=cwd,
                 env=terminal_env,
                 output_byte_limit=outputByteLimit,
+                result_future=result_future,
             )
         )
+        await result_future
+        if not result_future.result():
+            raise jsonrpc.JSONRPCError("Failed to create a terminal.")
         return {"terminalId": terminal_id}
 
     # https://agentclientprotocol.com/protocol/schema#killterminalcommandrequest
@@ -381,6 +385,8 @@ class Agent(AgentBase):
             except Exception:
                 # TODO: handle this
                 raise
+
+            log(agent_data)
 
             if isinstance(agent_data, dict):
                 if "result" in agent_data or "error" in agent_data:

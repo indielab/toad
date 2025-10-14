@@ -165,6 +165,7 @@ class Conversation(containers.Vertical):
         self.set_reactive(Conversation.project_path, project_path)
         self.agent_slash_commands: list[SlashCommand] = []
         self.slash_command_hints: dict[str, str] = {}
+        self.terminals: dict[str, Terminal] = {}
 
     def compose(self) -> ComposeResult:
         yield Throbber(id="throbber")
@@ -424,6 +425,7 @@ class Conversation(containers.Vertical):
             return None
         return terminal
 
+    @work
     @on(acp_messages.CreateTerminal)
     async def on_acp_create_terminal(self, message: acp_messages.CreateTerminal):
         from toad.widgets.terminal import Terminal, Command
@@ -434,16 +436,31 @@ class Conversation(containers.Vertical):
             message.env or {},
             message.cwd or str(self.project_path),
         )
+        width = self.scrollable_content_region.width - 5
+        height = self.window.scrollable_content_region.height - 2
+
         terminal = Terminal(
             command,
             output_byte_limit=message.output_byte_limit,
             id=message.terminal_id,
+            minimum_terminal_width=width,
         )
-        # terminal.display = False
-        width, height = self.contents.scrollable_content_region.size
-        width -= 4
-        terminal.start(width, height)
-        await self.post(terminal)
+        self.terminals[message.terminal_id] = terminal
+        terminal.display = False
+
+        try:
+            await terminal.start(width, height)
+        except Exception as error:
+            log(str(error))
+            message.result_future.set_result(False)
+            return
+
+        try:
+            await self.post(terminal)
+        except Exception:
+            message.result_future.set_result(False)
+        else:
+            message.result_future.set_result(True)
 
     @on(acp_messages.KillTerminal)
     async def on_acp_kill_terminal(self, message: acp_messages.KillTerminal):

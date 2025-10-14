@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from asyncio import Future
@@ -77,6 +79,7 @@ class CreateTerminal(AgentMessage):
 
     terminal_id: str
     command: str
+    result_future: Future[bool]
     args: list[str] | None = None
     cwd: str | None = None
     env: Mapping[str, str] | None = None
