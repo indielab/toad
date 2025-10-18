@@ -110,7 +110,7 @@ class ToolCall(containers.VerticalGroup):
         elif status == "completed":
             header += Content.from_markup(" [$success]✔")
 
-        yield ToolCallHeader(header).with_tooltip(title)
+        yield ToolCallHeader(header, markup=False).with_tooltip(title)
         with containers.VerticalGroup(id="tool-content"):
             yield from self._compose_content(content)
 
@@ -131,10 +131,12 @@ class ToolCall(containers.VerticalGroup):
                     if "\x1b" in text:
                         parsed_ansi_text = Text.from_ansi(text)
                         yield TextContent(Content.from_rich_text(parsed_ansi_text))
-                    elif "```" in text or re.match(r"^#{1,6}\s.*$", text, re.MULTILINE):
+                    elif "```" in text or re.search(
+                        r"^#{1,6}\s.*$", text, re.MULTILINE
+                    ):
                         yield MarkdownContent(text)
                     else:
-                        yield TextContent(text)
+                        yield TextContent(text, markup=False)
 
         for content in tool_call_content:
             log(content)

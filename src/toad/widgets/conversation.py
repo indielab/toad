@@ -172,8 +172,6 @@ class Conversation(containers.Vertical):
     agent: var[AgentBase | None] = var(None)
     agent_info: var[Content] = var(Content())
     agent_ready: var[bool] = var(False)
-    _agent_response: var[AgentResponse | None] = var(None)
-    _agent_thought: var[AgentThought | None] = var(None)
     modes: var[dict[str, Mode]] = var({}, bindings=True)
     current_mode: var[Mode | None] = var(None)
 
@@ -184,6 +182,8 @@ class Conversation(containers.Vertical):
         self.slash_command_hints: dict[str, str] = {}
         self.terminals: dict[str, Terminal] = {}
         self._loading: Loading | None = None
+        self._agent_response: AgentResponse | None = None
+        self._agent_thought: AgentThought | None = None
 
     def compose(self) -> ComposeResult:
         with Window():
@@ -209,34 +209,28 @@ class Conversation(containers.Vertical):
             return bool(self.modes)
         return True
 
-    async def get_agent_response(self) -> AgentResponse:
+    async def post_agent_response(self, fragment: str = "") -> AgentResponse:
         """Get or create an agent response widget."""
         from toad.widgets.agent_response import AgentResponse
 
         if self._agent_response is None:
             self._agent_response = agent_response = AgentResponse(
-                self.conversation, None
+                self.conversation, fragment
             )
-            await self.post(self._agent_response)
-            return agent_response
-
+            await self.post(agent_response)
+        else:
+            await self._agent_response.append_fragment(fragment)
         return self._agent_response
 
-    async def get_agent_thought(self) -> AgentThought:
+    async def post_agent_thought(self, thought_fragment: str) -> AgentThought:
         """Get or create an agent thought widget."""
         from toad.widgets.agent_thought import AgentThought
 
-        if self.contents.children and not isinstance(
-            self.contents.children[-1], AgentThought
-        ):
-            if self._agent_thought is not None:
-                self._agent_thought.loading = False
-            self._agent_thought = None
-
         if self._agent_thought is None:
-            agent_thought = self._agent_thought = AgentThought("")
-            await self.post(self._agent_thought, loading=True)
-            return agent_thought
+            self._agent_thought = AgentThought(thought_fragment)
+            await self.post(self._agent_thought)
+        else:
+            await self._agent_thought.append_fragment(thought_fragment)
         return self._agent_thought
 
     @property
@@ -329,7 +323,7 @@ class Conversation(containers.Vertical):
                 self.notify(error.message, title="Send prompt", severity="error")
             finally:
                 self.busy_count -= 1
-            await self.agent_turn_over(stop_reason)
+            self.call_later(self.agent_turn_over, stop_reason)
 
     async def agent_turn_over(self, stop_reason: str | None) -> None:
         """Called when the agent's turn is over.
@@ -370,16 +364,15 @@ class Conversation(containers.Vertical):
     @on(acp_messages.Update)
     async def on_acp_agent_message(self, message: acp_messages.Update):
         message.stop()
-        if self._agent_thought and self._agent_thought.loading:
-            await self._agent_thought.remove()
-        agent_response = await self.get_agent_response()
-        await agent_response.append_fragment(message.text)
+        # if self._agent_thought and self._agent_thought.loading:
+        #     await self._agent_thought.remove()
+        self._agent_thought = None
+        await self.post_agent_response(message.text)
 
     @on(acp_messages.Thinking)
     async def on_acp_agent_thinking(self, message: acp_messages.Thinking):
         message.stop()
-        agent_thought = await self.get_agent_thought()
-        await agent_thought.append_fragment(message.text)
+        await self.post_agent_thought(message.text)
 
     @on(acp_messages.RequestPermission)
     async def on_acp_request_permission(self, message: acp_messages.RequestPermission):
