@@ -243,6 +243,7 @@ class Prompt(containers.VerticalGroup):
     shell_mode = var(False)
     multi_line = var(False)
     show_path_search = var(False, toggle_class="-show-path-search")
+    project_path = var(Path())
     working_directory = var("")
     agent_info = var(Content(""))
     ask: var[Ask | None] = var(None)
@@ -333,6 +334,24 @@ class Prompt(containers.VerticalGroup):
 
     def watch_shell_mode(self) -> None:
         self.update_prompt()
+
+    # def watch_project_path(self, path: Path) -> None:
+    #     pass
+
+    def watch_working_directory(self, working_directory: str) -> None:
+        out_of_bounds = not Path(working_directory).is_relative_to(self.project_path)
+        if out_of_bounds and not self.has_class("-working-directory-out-of-bounds"):
+            self.post_message(
+                messages.Flash(
+                    "You have navigated away from the project directory",
+                    style="error",
+                    duration=5,
+                )
+            )
+        self.set_class(
+            out_of_bounds,
+            "-working-directory-out-of-bounds",
+        )
 
     def watch_ask(self, ask: Ask | None) -> None:
         self.set_class(ask is not None, "-mode-ask")
@@ -566,7 +585,7 @@ class Prompt(containers.VerticalGroup):
 
     def compose(self) -> ComposeResult:
         yield AutoCompleteOptions()
-        yield PathSearch().data_bind(root=Prompt.working_directory)
+        yield PathSearch().data_bind(root=Prompt.project_path)
 
         with containers.HorizontalGroup(id="prompt-container"):
             yield Question()

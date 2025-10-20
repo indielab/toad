@@ -22,7 +22,7 @@ from textual.widget import Widget
 from textual.widgets import Static
 from textual.widgets.markdown import MarkdownBlock, MarkdownFence
 from textual.geometry import Offset, Spacing
-from textual.reactive import var, Initialize
+from textual.reactive import var
 from textual.layouts.grid import GridLayout
 from textual.layout import WidgetPlacement
 
@@ -179,10 +179,11 @@ class Conversation(containers.Vertical):
     def __init__(self, project_path: Path) -> None:
         super().__init__()
 
-        self.project_path = project_path
-        self.working_directory = str(project_path)
-        # self.set_reactive(Conversation.project_path, project_path)
-        # self.set_reactive(Conversation.working_directory, str(project_path))
+        project_path = project_path.resolve().absolute()
+        # self.project_path = project_path
+        # self.working_directory = str(project_path)
+        self.set_reactive(Conversation.project_path, project_path)
+        self.set_reactive(Conversation.working_directory, str(project_path))
         self.agent_slash_commands: list[SlashCommand] = []
         self.slash_command_hints: dict[str, str] = {}
         self.terminals: dict[str, Terminal] = {}
@@ -201,6 +202,7 @@ class Conversation(containers.Vertical):
                 yield Contents(id="contents")
         yield Flash()
         yield Prompt().data_bind(
+            project_path=Conversation.project_path,
             working_directory=Conversation.working_directory,
             agent_info=Conversation.agent_info,
             agent_ready=Conversation.agent_ready,
@@ -398,8 +400,8 @@ class Conversation(containers.Vertical):
     ) -> None:
         if self._ansi_log is not None:
             self._ansi_log.finalize()
-        self.working_directory = str(event.path)
-        self.prompt.current_directory.path = event.path
+        self.working_directory = str(Path(event.path).resolve().absolute())
+        # self.prompt.current_directory.path = event.path
 
     @on(ShellFinished)
     def on_shell_finished(self) -> None:
@@ -990,31 +992,31 @@ class Conversation(containers.Vertical):
             menu_options.extend(block.get_block_menu())
             menu = Menu(block, menu_options)
 
-        elif isinstance(block, MarkdownBlock):
-            if block.name is None:
-                self.app.bell()
-                return
+            # elif isinstance(block, MarkdownBlock):
+            #     if block.name is None:
+            #         self.app.bell()
+            #         return
 
-            menu_options.append(
-                MenuItem("Explain this", "explain", "e"),
-            )
-            menu_options.extend(CONVERSATION_MENUS.get(block.name, []))
+            #     menu_options.append(
+            #         MenuItem("Explain this", "explain", "e"),
+            #     )
+            #     menu_options.extend(CONVERSATION_MENUS.get(block.name, []))
 
-            from toad.code_analyze import get_special_name_from_code
+            #     from toad.code_analyze import get_special_name_from_code
 
-            if (
-                block.name == "fence"
-                and isinstance(block, MarkdownFence)
-                and block.source
-            ):
-                for numeral, name in enumerate(
-                    get_special_name_from_code(block.source, block.lexer), 1
-                ):
-                    menu_options.append(
-                        MenuItem(
-                            f"Explain '{name}'", f"explain('{name}')", f"{numeral}"
-                        )
-                    )
+            #     if (
+            #         block.name == "fence"
+            #         and isinstance(block, MarkdownFence)
+            #         and block.source
+            #     ):
+            #         for numeral, name in enumerate(
+            #             get_special_name_from_code(block.source, block.lexer), 1
+            #         ):
+            #             menu_options.append(
+            #                 MenuItem(
+            #                     f"Explain '{name}'", f"explain('{name}')", f"{numeral}"
+            #                 )
+            #             )
 
             menu = Menu(block, menu_options)
         else:

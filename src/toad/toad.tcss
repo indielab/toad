@@ -363,6 +363,10 @@ Prompt {
             }
         }
     }
+
+    &.-working-directory-out-of-bounds #info-container CondensedPath {        
+        color: $text-error;
+    }
     
     #info-container {                
         height: auto;        
@@ -371,7 +375,7 @@ Prompt {
             width: 1fr;
             height: 1;
             text-wrap: nowrap;
-            color: $text-warning;        
+            color: $text-warning;            
         }
         AgentInfo {
             padding: 0 1;
