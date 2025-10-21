@@ -161,7 +161,7 @@ class SettingsScreen(ModalScreen):
                 yield from compose(self, schema_to_widget("", schema.settings_map))
 
         yield Footer()
-
+    
     @on(Input.Blurred, "Input")
     @on(Input.Submitted, "Input")
     def on_input_blurred(self, event: Input.Blurred) -> None:
@@ -217,3 +217,8 @@ class SettingsScreen(ModalScreen):
                 return None
             return None if self.search_input.has_focus else True
         return True
+
+    def action_dismiss(self, result: Any | None = None) -> None:
+        self.query("*:focus").blur()
+        self.call_after_refresh(self.dismiss)
+        

@@ -22,6 +22,13 @@ def acp(command: str, project_dir: str | None) -> None:
     app.run()
 
 
+@main.command("settings")
+def settings() -> None:
+    app = ToadApp()
+    print(f'{app.settings_path}')
+    
+    
+
 @main.command("replay")
 @click.argument("path", metavar="PATH.jsonl")
 def replay(path: str) -> None:

@@ -125,15 +125,19 @@ class Shell:
 
         shell = self.shell
 
-        _process = await asyncio.create_subprocess_shell(
-            shell,
-            stdin=slave,
-            stdout=slave,
-            stderr=slave,
-            env=env,
-            cwd=current_directory,
-            start_new_session=True,  # Linux / macOS only
-        )
+        try:
+            _process = await asyncio.create_subprocess_shell(
+                shell,
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                env=env,
+                cwd=current_directory,
+                start_new_session=True,  # Linux / macOS only
+            )
+        except Exception as error:
+            self.conversation.notify(f"Unable to start shell: {error}\n\nCheck your settings.", title="Shell", severity="error")
+            return
 
         os.close(slave)
         BUFFER_SIZE = 64 * 1024
@@ -152,8 +156,6 @@ class Shell:
             os.fdopen(os.dup(master), "wb", 0),
         )
         self.writer = write_transport
-        # if not IS_MACOS:
-        #     self.writer.write(b'set +x\nPS1="";\n')
 
         if shell_start := self.shell_start.strip():
             shell_start = self.shell_start.strip()
