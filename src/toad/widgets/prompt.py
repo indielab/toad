@@ -288,6 +288,11 @@ class Prompt(containers.VerticalGroup):
             self.prompt_text_area.suggestion = ""
 
     def ask(self, ask: Ask) -> None:
+        """Replace the textarea prompt with a menu of options.
+
+        Args:
+            ask: An `Ask` instance which contains a question and responses.
+        """
         self.ask_queue.append(ask)
         if self._ask is None:
             self._ask = self.ask_queue.pop(0)
