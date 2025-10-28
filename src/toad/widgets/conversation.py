@@ -69,6 +69,10 @@ class Loading(Static):
 
 
 class Cursor(Static):
+    """The block 'cursor' -- A vertical line to the left of a block in the conversation that
+    is used to navigate the discussion history.
+    """
+
     follow_widget: var[Widget | None] = var(None)
     blink = var(True, toggle_class="-blink")
 
@@ -134,6 +138,8 @@ class Window(containers.VerticalScroll):
 
 
 class Conversation(containers.Vertical):
+    """Holds the agent conversation (input, output, and various controls / information)."""
+
     BINDING_GROUP_TITLE = "Conversation"
     CURSOR_BINDING_GROUP = Binding.Group(description="Cursor")
     BINDINGS = [

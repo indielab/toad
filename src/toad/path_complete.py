@@ -1,4 +1,5 @@
 import asyncio
+import os
 from pathlib import Path
 
 
@@ -30,6 +31,8 @@ def longest_common_prefix(strings: list[str]) -> str:
 
 
 class DirectoryReadTask:
+    """A task to read a directory."""
+
     def __init__(self, path: Path) -> None:
         self.path = path
         self.done_event = asyncio.Event()
@@ -54,15 +57,19 @@ class DirectoryReadTask:
 
 
 class PathComplete:
+    """Auto completes paths."""
+
     def __init__(self) -> None:
         self.read_tasks: dict[Path, DirectoryReadTask] = {}
         self.directory_listings: dict[Path, list[Path]] = {}
 
-    async def __call__(self, current_working_directory: Path, path: str) -> str | None:
-        directory_path = (
+    async def __call__(
+        self, current_working_directory: Path, path: str
+    ) -> tuple[str | None, list[str] | None]:
+        current_working_directory = (
             current_working_directory.expanduser().resolve().absolute()
-            / Path(path).expanduser()
         )
+        directory_path = (current_working_directory / Path(path).expanduser()).resolve()
 
         node: str = path
         if not directory_path.is_dir():
@@ -75,18 +82,40 @@ class PathComplete:
             read_task.start()
             listing = await read_task.wait()
 
+        if not node:
+            return None, [listing_path.name for listing_path in listing]
+
         if not (
             matching_nodes := [
-                path.name for path in listing if path.name.startswith(node)
+                listing_path
+                for listing_path in listing
+                if listing_path.name.startswith(node)
             ]
         ):
             # Nothing matches
-            return None
+            return None, None
 
-        if not (prefix := longest_common_prefix(matching_nodes)):
-            return None
+        if not (
+            prefix := longest_common_prefix(
+                [node_path.name for node_path in matching_nodes]
+            )
+        ):
+            return None, None
 
-        return prefix[len(path) :]
+        picked_path = directory_path / prefix
+        path_size = (
+            len(str(Path(directory_path).expanduser().resolve())) + 1 + len(node)
+        )
+        completed_prefix = str(picked_path)[path_size:]
+        path_options = [
+            str(path)[path_size + len(completed_prefix) :] for path in matching_nodes
+        ]
+        path_options = [name for name in path_options if name]
+
+        if picked_path.is_dir() and not path_options:
+            completed_prefix += os.sep
+
+        return completed_prefix or None, path_options
 
 
 if __name__ == "__main__":
@@ -95,6 +124,6 @@ if __name__ == "__main__":
         path_complete = PathComplete()
         cwd = Path("~/sandbox")
 
-        print(await path_complete(cwd, "cl"))
+        print(await path_complete(cwd, "~/p"))
 
     asyncio.run(run())

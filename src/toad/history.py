@@ -89,7 +89,7 @@ class History:
         if not input:
             return True
 
-        self.complete.add_words([input])
+        self.complete.add_words([input.split(" ")[0]])
 
         def write_line() -> bool:
             """Append a line to the history.
