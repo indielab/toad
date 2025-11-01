@@ -1,13 +1,10 @@
 from dataclasses import dataclass
 
 from textual.app import ComposeResult
-from textual.layout import Layout
-from textual.layouts.grid import GridLayout
 from textual.widget import Widget
 from textual import containers
 from textual import widgets
 from textual.message import Message
-from textual.reactive import var
 
 
 class SideBar(containers.Vertical):

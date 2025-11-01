@@ -17,10 +17,43 @@ def main(ctx):
 @main.command("acp")
 @click.argument("command", metavar="COMMAND")
 @click.option("--project-dir", metavar="PATH", default=None)
-def acp(command: str, project_dir: str | None) -> None:
+@click.option(
+    "--port",
+    metavar="PORT",
+    default=8000,
+    type=int,
+    help="Port to use in conjunction with --serve",
+)
+@click.option(
+    "--host",
+    metavar="HOST",
+    default="localhost",
+    help="Host to use in conjunction with --serve",
+)
+@click.option("--serve", is_flag=True, help="Serve Toad as a web application")
+def acp(
+    command: str, host: str, port: int, project_dir: str | None, serve: bool = False
+) -> None:
     """Run an ACP client."""
     app = ToadApp(acp_command=command, project_dir=project_dir)
-    app.run()
+    if serve:
+        import shlex
+        from textual_serve.server import Server
+
+        command_components = [sys.argv[0], "acp", command]
+        if project_dir:
+            command_components.append(f"--project-dir={project_dir}")
+        serve_command = shlex.join(command_components)
+
+        server = Server(
+            serve_command,
+            host=host,
+            port=port,
+            title=serve_command,
+        )
+        server.serve()
+    else:
+        app.run()
 
 
 @main.command("settings")
@@ -42,6 +75,17 @@ def replay(path: str) -> None:
             time.sleep(0.1)
             stdout.write(line)
             stdout.flush()
+
+
+@main.command("serve")
+@click.option("--port", metavar="PORT", default=8000, type=int)
+@click.option("--host", metavar="HOST", default="localhost")
+def serve(port: int, host: str) -> None:
+    """Serve Toad as a web application."""
+    from textual_serve.server import Server
+
+    server = Server(sys.argv[0], host=host, port=port, title="Toad")
+    server.serve()
 
 
 if __name__ == "__main__":
