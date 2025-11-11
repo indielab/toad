@@ -10,6 +10,7 @@ from textual import getters
 from textual import on
 from textual.app import ComposeResult
 from textual.content import Content
+from textual.css.query import NoMatches
 from textual import containers
 from textual import widgets
 
@@ -61,7 +62,7 @@ class AgentItem(containers.VerticalGroup):
 
 class Launcher(containers.VerticalGroup):
     app = getters.app(ToadApp)
-    grid_select = getters.query_one("#launcher", GridSelect)
+    grid_select = getters.query_one("#launcher-grid-select", GridSelect)
     DIGITS = "123456789ABCDEF"
 
     def __init__(
@@ -77,14 +78,17 @@ class Launcher(containers.VerticalGroup):
 
     @property
     def highlighted(self) -> int | None:
-        return self.query_one("#launcher", GridSelect).highlighted
+        return self.grid_select.highlighted
 
     @highlighted.setter
     def highlighted(self, value: int) -> None:
-        self.query_one("#launcher", GridSelect).highlighted = value
+        self.grid_select.highlighted = value
 
     def focus(self, scroll_visible: bool = True) -> Self:
-        self.grid_select.focus(scroll_visible=scroll_visible)
+        try:
+            self.grid_select.focus(scroll_visible=scroll_visible)
+        except NoMatches:
+            pass
         return self
 
     def compose(self) -> ComposeResult:
@@ -94,7 +98,9 @@ class Launcher(containers.VerticalGroup):
         agents = self._agents
 
         if launcher_set:
-            with GridSelect(id="launcher", min_column_width=40, max_column_width=40):
+            with GridSelect(
+                id="launcher-grid-select", min_column_width=40, max_column_width=40
+            ):
                 for digit, identity in zip_longest(self.DIGITS, launcher_set):
                     if identity is None:
                         break
@@ -168,9 +174,7 @@ class StoreScreen(Screen):
                 with containers.Grid(id="title-grid"):
                     yield Mandelbrot()
                     yield widgets.Label(self.get_info(), id="info")
-
-            yield widgets.LoadingIndicator()
-
+            # yield widgets.LoadingIndicator()
         yield widgets.Footer()
 
     def get_info(self) -> Content:
@@ -237,7 +241,7 @@ class StoreScreen(Screen):
                 severity="error",
             )
         else:
-            await self.query(widgets.LoadingIndicator).remove()
+            # await self.query(widgets.LoadingIndicator).remove()
             await self.query_one("#container").mount_compose(self.compose_agents())
 
     def setting_updated(self, setting: tuple[str, object]) -> None:
