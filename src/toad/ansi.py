@@ -882,7 +882,6 @@ class TerminalState:
 
         # Unfolded cursor position
         cursor_line, cursor_offset = buffer.cursor
-        print(cursor_line, cursor_offset)
 
         buffer.folded_lines.clear()
         buffer.line_to_fold.clear()
