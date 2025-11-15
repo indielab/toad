@@ -28,6 +28,7 @@ class Terminal(ScrollView):
             classes=classes,
             disabled=disabled,
         )
+        self.minimum_terminal_width = minimum_terminal_width
         self.state = ansi.TerminalState()
         self._update_timer: Timer | None = None
         self._width: int = 80
@@ -59,15 +60,15 @@ class Terminal(ScrollView):
         window_width = self.scrollable_content_region.width or 80
         if window_width == self._width:
             return
-        self._width = window_width
-        # self.max_window_width = max(self.max_window_width, window_width)
-        # if self.minimum_terminal_width == -1 and window_width:
-        #     self.minimum_terminal_width = window_width
-        # width = max(
-        #     self.minimum_terminal_width,
-        #     max(min(self.max_line_width, self.max_window_width), window_width),
-        # )
-        # self._width = width
+        # self._width = window_width
+        self.max_window_width = max(self.max_window_width, window_width)
+        if self.minimum_terminal_width == -1 and window_width:
+            self.minimum_terminal_width = window_width
+        width = max(
+            self.minimum_terminal_width,
+            max(min(self.max_line_width, self.max_window_width), window_width),
+        )
+        self._width = width
         self.state.update_size(width=self._width)
         self._render_cache.clear()
         self.refresh()

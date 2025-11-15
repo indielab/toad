@@ -895,23 +895,19 @@ class TerminalState:
             buffer.line_to_fold.append(len(buffer.folded_lines))
             buffer.folded_lines.extend(line_record.folds)
 
+        # After reflow, we need to work out where the cursor is within the folded lines
         line = buffer.lines[cursor_line]
         fold_cursor_line = buffer.line_to_fold[cursor_line]
 
+        fold_cursor_offset = 0
         for fold in reversed(line.folds):
             if cursor_offset >= fold.offset:
                 fold_cursor_line += fold.line_offset
                 fold_cursor_offset = cursor_offset - fold.offset
                 break
 
-        # print("!", fold_cursor_line)
-        # fold_cursor_offset = (
-        #     cursor_offset - buffer.folded_lines[fold_cursor_line].offset
-        # )
         buffer.cursor_line = fold_cursor_line
         buffer.cursor_offset = fold_cursor_offset
-
-        print("new cursor", buffer.cursor_line, buffer.cursor_offset)
 
     def write(self, text: str) -> None:
         """Write to the terminal.
