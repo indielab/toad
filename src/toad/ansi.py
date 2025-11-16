@@ -123,6 +123,8 @@ class CSIPattern(Pattern):
 
 
 class DECPattern(Pattern):
+    """Character set sequence."""
+
     def check(self) -> PatternCheck:
         if (initial_character := (yield)) not in "()*+":
             return False
@@ -132,6 +134,8 @@ class DECPattern(Pattern):
 
 
 class DECInvokePattern(Pattern):
+    """Invoke a character set."""
+
     INVOKE_G2_INTO_GL = DECInvoke(gl=2)
     INVOKE_G3_INTO_GL = DECInvoke(gl=3)
     INVOKE_G1_INTO_GR = DECInvoke(gr=1)
@@ -602,12 +606,18 @@ class ANSIStyle(NamedTuple):
 
     style: Style
 
+    def __rich_repr__(self) -> rich.repr.Result:
+        yield self.style
+
 
 @rich.repr.auto
 class ANSIClear(NamedTuple):
     """Enumare for clearing the 'screen'."""
 
     clear: ClearType
+
+    def __rich_repr__(self) -> rich.repr.Result:
+        yield self.clear
 
 
 @rich.repr.auto
@@ -616,11 +626,18 @@ class ANSICursorShow(NamedTuple):
 
     show: bool
 
+    def __rich_repr__(self) -> rich.repr.Result:
+        yield self.show
+
 
 @rich.repr.auto
 class ANSIScrollMargin(NamedTuple):
     top: int | None = None
     bottom: int | None = None
+
+    def __rich_repr__(self) -> rich.repr.Result:
+        yield self.top
+        yield self.bottom
 
 
 @rich.repr.auto
@@ -629,6 +646,9 @@ class ANSIAlternateScreen(NamedTuple):
 
     enable: bool
 
+    def __rich_repr__(self) -> rich.repr.Result:
+        yield self.enable
+
 
 # Not technically part of the terminal protocol
 @rich.repr.auto
@@ -636,6 +656,9 @@ class ANSIWorkingDirectory(NamedTuple):
     """Working directory changed"""
 
     path: str
+
+    def __rich_repr__(self) -> rich.repr.Result:
+        yield self.path
 
 
 @rich.repr.auto
@@ -981,7 +1004,6 @@ class TerminalState:
         """Width of the terminal."""
         self.height = height
         """Height of the terminal."""
-
         self.style = Style()
         """The current style."""
 
@@ -989,6 +1011,8 @@ class TerminalState:
         """Is the cursor visible?"""
         self.alternate_screen = False
         """Is the terminal in the alternate buffer state?"""
+        self.bracketed_paste = False  # TODO
+        """Is bracketed pase enabled?"""
 
         self.current_directory: str = ""
         """Current working directory."""
@@ -1122,9 +1146,11 @@ class TerminalState:
                             content,
                             line.content[end_replace + 1 :],
                         )
-                        updated_line = updated_line.extend_right(
-                            self.width - updated_line.cell_length
-                        )
+                        if updated_line.cell_length < self.width:
+                            updated_line += Content.styled(
+                                " " * (self.width - updated_line.cell_length),
+                                self.style,
+                            )
                     else:
                         if cursor_line_offset == len(line.content):
                             updated_line = line.content + content

@@ -124,6 +124,8 @@ if __name__ == "__main__":
     from textual.app import App, ComposeResult
 
     COMMAND = """htop"""
+    # COMMAND = "uv run python -m textual"
+    # COMMAND = "uv run python"
 
     class CommandApp(App):
         CSS = """

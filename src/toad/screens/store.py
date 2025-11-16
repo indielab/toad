@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from importlib.metadata import version
 from itertools import zip_longest
 from pathlib import Path
@@ -12,6 +13,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.content import Content
 from textual.css.query import NoMatches
+from textual.message import Message
 from textual import containers
 from textual import widgets
 
@@ -63,9 +65,30 @@ class AgentItem(containers.VerticalGroup):
 
 
 class LauncherGridSelect(GridSelect):
+    app = getters.app(ToadApp)
     BINDINGS = [
-        Binding("enter", "select", "Launch"),
+        Binding("enter", "select", "Details", tooltip="Open agent details"),
+        # Binding("r", "remove", "Remove", tooltip="Remove agent from launcher"),
+        # Binding("space", "details", "Details", tooltip="Agent details"),
     ]
+
+    def action_details(self) -> None:
+        if self.highlighted is None:
+            return
+        agent_item = self.children[self.highlighted]
+        assert isinstance(agent_item, LauncherItem)
+        self.post_message(StoreScreen.OpenAgentDetails(agent_item._agent["identity"]))
+
+    def action_remove(self) -> None:
+        agents = self.app.settings.get("launcher.agents", str).splitlines()
+        if self.highlighted is None:
+            return
+        try:
+            del agents[self.highlighted]
+        except IndexError:
+            pass
+        else:
+            self.app.settings.set("launcher.agents", "\n".join(agents))
 
 
 class Launcher(containers.VerticalGroup):
@@ -107,7 +130,7 @@ class Launcher(containers.VerticalGroup):
 
         if launcher_set:
             with LauncherGridSelect(
-                id="launcher-grid-select", min_column_width=40, max_column_width=40
+                id="launcher-grid-select", min_column_width=32, max_column_width=32
             ):
                 for digit, identity in zip_longest(self.DIGITS, launcher_set):
                     if identity is None:
@@ -140,6 +163,10 @@ class LauncherItem(containers.VerticalGroup):
                 yield widgets.Static(agent["description"], id="description")
 
 
+class AgentGridSelect(GridSelect):
+    BINDINGS = [Binding("enter", "select", "Details", tooltip="Open agent details")]
+
+
 class StoreScreen(Screen):
     CSS_PATH = "store.tcss"
 
@@ -165,10 +192,14 @@ class StoreScreen(Screen):
         ),
     ]
 
-    agents_view = getters.query_one("#agents-view", GridSelect)
+    agents_view = getters.query_one("#agents-view", AgentGridSelect)
     launcher = getters.query_one("#launcher", Launcher)
 
     app = getters.app(ToadApp)
+
+    @dataclass
+    class OpenAgentDetails(Message):
+        identity: str
 
     def __init__(
         self, name: str | None = None, id: str | None = None, classes: str | None = None
@@ -177,11 +208,13 @@ class StoreScreen(Screen):
         super().__init__(name=name, id=id, classes=classes)
 
     def compose(self) -> ComposeResult:
+        with containers.VerticalGroup(id="title-container"):
+            with containers.Grid(id="title-grid"):
+                yield Mandelbrot()
+                yield widgets.Label(self.get_info(), id="info")
         with containers.VerticalScroll(id="container"):
-            with containers.VerticalGroup(id="title-container"):
-                with containers.Grid(id="title-grid"):
-                    yield Mandelbrot()
-                    yield widgets.Label(self.get_info(), id="info")
+            pass
+
             # yield widgets.LoadingIndicator()
         yield widgets.Footer()
 
@@ -197,7 +230,7 @@ class StoreScreen(Screen):
             "\n",
             (
                 Content.from_markup(
-                    "\nConsider sponsoring [@click=screen.url('https://github.com/sponsors/willmcgugan')]@willmcgugan[/] to support development of Toad!"
+                    "\nConsider sponsoring [@click=screen.url('https://github.com/sponsors/willmcgugan')]@willmcgugan[/] to support future updates"
                 )
             ),
             "\n\n",
@@ -223,12 +256,22 @@ class StoreScreen(Screen):
         ordered_agents = sorted(
             agents.values(), key=lambda agent: agent["name"].casefold()
         )
-        yield widgets.Static("Agents", classes="heading")
-        with GridSelect(id="agents-view", min_column_width=40):
+
+        recommended_agents = [
+            agent for agent in ordered_agents if agent.get("reccommended", False)
+        ]
+        if recommended_agents:
+            yield widgets.Static("Reccomended Agents", classes="heading")
+            with AgentGridSelect(id="reccommended-agents-view", min_column_width=40):
+                for agent in recommended_agents:
+                    yield AgentItem(agent)
+
+        yield widgets.Static("All agents", classes="heading")
+        with AgentGridSelect(id="agents-view", min_column_width=40):
             for agent in ordered_agents:
                 yield AgentItem(agent)
 
-    @on(GridSelect.Selected, "#agents-view")
+    @on(GridSelect.Selected, "#agents-view,#reccommended-agents-view")
     @work
     async def on_grid_select_selected(self, event: GridSelect.Selected):
         assert isinstance(event.selected_widget, AgentItem)
@@ -237,19 +280,42 @@ class StoreScreen(Screen):
         await self.app.push_screen_wait(AgentModal(event.selected_widget.agent))
         self.app.save_settings()
 
+    @on(OpenAgentDetails)
+    @work
+    async def open_agent_detail(self, message: OpenAgentDetails) -> None:
+        from toad.screens.agent_modal import AgentModal
+
+        try:
+            agent = self._agents[message.identity]
+        except KeyError:
+            return
+        await self.app.push_screen_wait(AgentModal(agent))
+        self.app.save_settings()
+
     @on(GridSelect.Selected, "#launcher GridSelect")
     @work
     async def on_launcher_selected(self, event: GridSelect.Selected):
         launcher_item = event.selected_widget
         assert isinstance(launcher_item, LauncherItem)
 
-        agent = launcher_item.agent
-        from toad.screens.main import MainScreen
+        from toad.screens.agent_modal import AgentModal
 
-        project_path = Path(self.app.project_dir or "./")
+        await self.app.push_screen_wait(AgentModal(launcher_item.agent))
+        self.app.save_settings()
 
-        screen = MainScreen(project_path, agent)
-        await self.app.push_screen_wait(screen)
+    # @on(GridSelect.Selected, "#launcher GridSelect")
+    # @work
+    # async def on_launcher_selected(self, event: GridSelect.Selected):
+    #     launcher_item = event.selected_widget
+    #     assert isinstance(launcher_item, LauncherItem)
+
+    #     agent = launcher_item.agent
+    #     from toad.screens.main import MainScreen
+
+    #     project_path = Path(self.app.project_dir or "./")
+
+    #     screen = MainScreen(project_path, agent)
+    #     await self.app.push_screen_wait(screen)
 
     @work
     async def on_mount(self) -> None:
@@ -265,6 +331,8 @@ class StoreScreen(Screen):
         else:
             # await self.query(widgets.LoadingIndicator).remove()
             await self.query_one("#container").mount_compose(self.compose_agents())
+            self.launcher.focus()
+            self.launcher.highlighted = 0
 
     def setting_updated(self, setting: tuple[str, object]) -> None:
         key, value = setting
@@ -278,7 +346,7 @@ class StoreScreen(Screen):
             launch_item_offset = "123456789abcdef".find(event.character)
             self.launcher.focus()
             try:
-                launch_item = self.launcher.grid_select.children[launch_item_offset]
+                self.launcher.grid_select.children[launch_item_offset]
             except IndexError:
                 self.notify(
                     f"No agent on key [b]{launch_item_offset}",

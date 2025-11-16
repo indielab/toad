@@ -99,6 +99,8 @@ class GridSelect(containers.ItemGrid, can_focus=True):
         if highlighted is None:
             return None
 
+        if not self.children:
+            return None
         if highlighted < 0:
             return 0
         if highlighted >= len(self.children):

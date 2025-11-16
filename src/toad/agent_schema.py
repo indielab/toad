@@ -1,4 +1,4 @@
-from typing import TypedDict, Literal
+from typing import TypedDict, Literal, NotRequired
 
 type Tag = str
 """A tag used for categorizing the agent. For example: 'open-source', 'reasoning' """
@@ -63,3 +63,6 @@ class Agent(TypedDict):
 
     actions: dict[OS, dict[Action, Command]]
     """Scripts to perform actions, typically at least to install the agent."""
+
+    reccomended: NotRequired[bool]
+    """Agent is in reccomended set."""

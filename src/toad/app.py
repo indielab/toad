@@ -267,11 +267,11 @@ class ToadApp(App, inherit_bindings=False):
             except Exception as error:
                 self.notify(str(error), title="Settings", severity="error")
             else:
-                self.notify(
-                    f"Saved settings to [$text-success]{path!r}",
-                    title="Settings",
-                    severity="information",
-                )
+                # self.notify(
+                #     f"Saved settings to [$text-success]{path!r}",
+                #     title="Settings",
+                #     severity="information",
+                # )
                 self.settings.up_to_date()
 
     def setting_updated(self, key: str, value: object) -> None:
