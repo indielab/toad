@@ -1756,11 +1756,6 @@ class TerminalState:
             style = self.style
             for line_no in range(self.height):
                 self.add_line(buffer, EMPTY_LINE, style)
-            # del buffer.lines[:]
-            # del buffer.folded_lines[:]
-            # self._updates += 1
-            # for line_no in range(line_count - height, line_count):
-            #     self.update_line(buffer, line_no, EMPTY_LINE)
 
     def scroll_buffer(self, direction: int, lines: int) -> None:
         """Scroll the buffer.

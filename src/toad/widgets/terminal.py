@@ -226,7 +226,7 @@ class Terminal(ScrollView, can_focus=True):
                 self._escape_reset_timer.stop()
 
         if event.key == "enter":
-            self.write_process_stdin("\n")
+            self.write_process_stdin("\r")
         else:
             if (stdin := self.state.key_event_to_stdin(event)) is not None:
                 self.write_process_stdin(stdin)
