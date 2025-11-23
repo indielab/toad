@@ -118,6 +118,46 @@ class ReadPatterns[ResultType](StreamRead[ResultType]):
 
 
 @rich.repr.auto
+class ReadPattern[ResultType](StreamRead[ResultType]):
+    """Special case for a single pattern."""
+
+    __slots__ = ["name", "pattern", "_text", "_exhaused"]
+
+    def __init__(self, start: str, name: str, pattern: Pattern) -> None:
+        self.name = name
+        self.pattern: Pattern = pattern
+        self._text = io.StringIO()
+        self._text.write(start)
+        self._exhaused = False
+
+    @property
+    def unconsumed_text(self) -> str:
+        return self._text.getvalue()
+
+    def __rich_repr__(self) -> rich.repr.Result:
+        yield self.name
+        yield self.pattern
+
+    @property
+    def is_exhausted(self) -> bool:
+        return self._exhaused
+
+    def feed(self, text: str) -> tuple[int, TokenMatch | None]:
+        consumed = 0
+        feed = self.pattern.feed
+        for character in text:
+            consumed += 1
+            if (value := feed(character)) is False:
+                self._exhaused = True
+                break
+            elif value:
+                self._exhaused = True
+                return consumed, ("pattern", value)
+        self._text.write(text[:consumed])
+        return consumed, None
+
+
+@rich.repr.auto
 class Token:
     """A token containing text."""
 
@@ -198,13 +238,16 @@ class StreamParser[ParseType]:
         """
         return ReadRegex(regex)
 
-    def read_patterns(self, start: str = "", **patterns) -> ReadPatterns:
+    def read_patterns(self, start: str = "", **patterns) -> ReadPattern | ReadPatterns:
         """Read until a pattern matches, or the patterns have been exhausted.
 
         Args:
             start: Initial part of the string.
             **patterns: One or more patterns.
         """
+        if len(patterns) == 1:
+            name, pattern = patterns.popitem()
+            return ReadPattern(start, name, pattern)
         return ReadPatterns(start, **patterns)
 
     def feed(self, text: str) -> Iterable[Token | ParseType]:
@@ -237,7 +280,22 @@ class StreamParser[ParseType]:
                 self._gen = None
 
         while text:
-            if isinstance(self._reading, Read):
+            if isinstance(self._reading, (ReadPattern, ReadPatterns)):
+                consumed, pattern_match = self._reading.feed(text)
+
+                if pattern_match is not None:
+                    name, value = pattern_match
+                    yield from send(PatternToken(name, value))
+                    text = text[consumed:]
+                else:
+                    if self._reading.is_exhausted:
+                        unconsumed_text = self._reading.unconsumed_text
+                        yield from send(Token(unconsumed_text))
+                        text = text[consumed:]
+                    else:
+                        text = ""
+
+            elif isinstance(self._reading, Read):
                 if self._reading.remaining:
                     read_text = text[: self._reading.remaining]
                     read_text_length = len(read_text)
@@ -277,21 +335,6 @@ class StreamParser[ParseType]:
                 else:
                     yield from send(Token(match_text))
                     text = ""
-
-            elif isinstance(self._reading, ReadPatterns):
-                consumed, pattern_match = self._reading.feed(text)
-
-                if pattern_match is not None:
-                    name, value = pattern_match
-                    yield from send(PatternToken(name, value))
-                    text = text[consumed:]
-                else:
-                    if self._reading.is_exhausted:
-                        unconsumed_text = self._reading.unconsumed_text
-                        yield from send(Token(unconsumed_text))
-                        text = text[consumed:]
-                    else:
-                        text = ""
 
     def parse(self) -> ParseResult[ParseType]:
         yield from ()

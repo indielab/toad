@@ -68,13 +68,9 @@ class FEPattern(Pattern):
     OSC_TERMINATORS = frozenset({"\x1b", "\x07", "\x9c"})
     DSC_TERMINATORS = frozenset({"\x9c"})
 
-    class Match(NamedTuple):
-        sequence: str
-
     def check(self) -> PatternCheck:
         sequence = io.StringIO()
         store = sequence.write
-        store("\x1b")
         store(character := (yield))
 
         match character:
@@ -459,7 +455,7 @@ class ANSIStream:
             Ansi segment, or `None` if one couldn't be decoded.
         """
 
-        if match := re.fullmatch(r"\x1b\[(\d+)?(?:;)?(\d*)?(\w)", csi):
+        if match := re.fullmatch(r"\[(\d+)?(?:;)?(\d*)?(\w)", csi):
             match match.groups(default=""):
                 case [lines, _, "A"]:
                     return ANSICursor(delta_y=-int(lines or 1))
@@ -528,7 +524,7 @@ class ANSIStream:
                     print("Unknown CSI (a)", repr(csi))
                     return None
 
-        elif match := re.fullmatch(r"\x1b\[([0-9:;<=>?]*)([!-/]*)([@-~])", csi):
+        elif match := re.fullmatch(r"\[([0-9:;<=>?]*)([!-/]*)([@-~])", csi):
             match match.groups(default=""):
                 case ["?25", "", "h"]:
                     return cls.SHOW_CURSOR
@@ -560,7 +556,7 @@ class ANSIStream:
                     # 't' = XTWINOPS (Window manipulation)
                     return None
                 case _:
-                    if match := re.fullmatch(r"\x1b\[\?([0-9;]+)([hl])", csi):
+                    if match := re.fullmatch(r"\[\?([0-9;]+)([hl])", csi):
                         modes = [m for m in match.group(1).split(";")]
                         enable = match.group(2) == "h"
                         tracking: MOUSE_TRACKING_MODES | None = None
@@ -613,7 +609,7 @@ class ANSIStream:
 
             case ["csi", csi]:
                 if csi.endswith("m"):
-                    if (sgr_style := self._parse_sgr(csi[2:-1])) is None:
+                    if (sgr_style := self._parse_sgr(csi[1:-1])) is None:
                         self.style = NULL_STYLE
                     else:
                         self.style += sgr_style
