@@ -84,7 +84,7 @@ StoreScreen {
    
 
     AgentItem {
-        height: auto;               
+        height: auto;             
         border: tall transparent;
         padding: 0 1;
         &:hover {

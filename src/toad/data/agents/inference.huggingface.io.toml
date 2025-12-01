@@ -3,7 +3,7 @@
 
 # TODO: To be populated by Huggingface
 
-active = true
+active = false
 identity = "inference.huggingface.io"
 name = "Huggingface Inference"
 short_name = "hf"
