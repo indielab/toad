@@ -1142,6 +1142,8 @@ class TerminalState:
                 self.update_line(buffer, line_no, copy_content, copy_style)
 
     def _handle_ansi_command(self, ansi_command: ANSICommand) -> None:
+        # print(repr(ansi_command))
+
         if isinstance(ansi_command, ANSINewLine):
             if self.alternate_screen:
                 # New line behaves differently in alternate screen
@@ -1201,10 +1203,10 @@ class TerminalState:
                     )
                     cursor_line_offset = self.get_cursor_line_offset(buffer)
 
-                    # if cursor_line_offset > len(line.content):
-                    #     line.content = line.content.pad_right(
-                    #         cursor_line_offset - len(line.content)
-                    #     )
+                    if cursor_line_offset > len(line.content):
+                        line.content = line.content.pad_right(
+                            cursor_line_offset - len(line.content)
+                        )
 
                     if replace is not None:
                         start_replace, end_replace = ansi_command.get_replace_offsets(
@@ -1250,6 +1252,7 @@ class TerminalState:
                         buffer.cursor_offset -= self.width
                 if absolute_x is not None:
                     buffer.cursor_offset = absolute_x
+                    buffer.update_line(buffer.cursor_line)
 
                 current_cursor_line = buffer.cursor_line
                 if delta_y is not None:
