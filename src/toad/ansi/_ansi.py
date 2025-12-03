@@ -1269,7 +1269,7 @@ class TerminalState:
 
                     if cursor_line_offset > len(line.content):
                         line.content = self._expand_content(
-                            line.content, cursor_line_offset, NULL_STYLE
+                            line.content, cursor_line_offset, line.style
                         )
 
                     if replace is not None:
@@ -1322,7 +1322,7 @@ class TerminalState:
                         buffer,
                         folded_line.line_no,
                         updated_line[: self.width],
-                        line.style,
+                        # line.style,
                     )
                     if not previous_content.is_same(folded_line.content):
                         buffer.updates = self.advance_updates()
