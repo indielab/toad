@@ -1150,6 +1150,8 @@ class TerminalState:
         buffer = self.buffer
         if clear == "screen":
             buffer.clear(self.advance_updates())
+            # for _ in range(self.height):
+            #     self.add_line(buffer, EMPTY_CONTENT)
         elif clear == "cursor_to_end":
             buffer._updated_lines = None
             folded_cursor_line = buffer.cursor_line
@@ -1348,11 +1350,6 @@ class TerminalState:
                             strip_control_codes=False,
                         )
                         self.update_line(buffer, folded_line.line_no, updated_line)
-                        # buffer.cursor_offset += blank_width
-                        # delta_x = (delta_x or 0) + blank_width
-                        # buffer.update_cursor(
-                        #     folded_line.line_no, cursor_line_offset + blank_width
-                        # )
 
                 if not previous_content.is_same(folded_line.content):
                     buffer.updates = self.advance_updates()

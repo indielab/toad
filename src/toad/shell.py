@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 
+from contextlib import suppress
 import os
 import asyncio
 import codecs
@@ -48,6 +49,8 @@ class ShellFinished(Message):
 
 
 class Shell:
+    """Responsible for shell interactions in Conversation."""
+
     def __init__(
         self,
         conversation: Conversation,
@@ -78,9 +81,6 @@ class Shell:
         await self._ready_event.wait()
         assert self.writer is not None
 
-        # self.width = width
-        # self.height = height
-
         resize_pty(self.master, width, max(height, 1))
 
         old_settings = termios.tcgetattr(self.master)
@@ -89,9 +89,6 @@ class Shell:
         new_settings = termios.tcgetattr(self.master)
         new_settings[3] = new_settings[3] & ~termios.ECHO  # lflag is at index 3
         termios.tcsetattr(self.master, termios.TCSADRAIN, new_settings)
-
-        # command = f"{command}\n"
-        # self.writer.write(command.encode("utf-8"))
 
         get_pwd_command = f"{command};" + r'printf "\e]2025;$(pwd);\e\\"' + "\n"
         self.writer.write(get_pwd_command.encode("utf-8"))
@@ -108,6 +105,16 @@ class Shell:
         """Interrupt the running command."""
         if self.writer is not None:
             self.writer.write(b"\x03")
+
+    def update_size(self, width: int, height: int) -> None:
+        """Update the size of the shell pty.
+
+        Args:
+            width: Desired width.
+            height: Desired height.
+        """
+        with suppress(OSError):
+            resize_pty(self.master, width, max(height, 1))
 
     async def run(self) -> None:
         current_directory = self.working_directory

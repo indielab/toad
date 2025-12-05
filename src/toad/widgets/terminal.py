@@ -167,6 +167,8 @@ class Terminal(ScrollView, can_focus=True):
         self.update_size(width, height)
 
     def update_size(self, width: int, height: int) -> None:
+        old_width = self._width
+        old_height = self._height
         self._terminal_render_cache.grow(height * 2)
         self._width = width or 80
         self._height = height or 24
@@ -174,6 +176,15 @@ class Terminal(ScrollView, can_focus=True):
         self.state.update_size(self._width, height)
         self._terminal_render_cache.clear()
         self.refresh()
+        if (
+            old_width != self._width
+            or old_height != self._height
+            and not self.is_finalized
+        ):
+            from toad.widgets.conversation import Conversation
+
+            if (conversation := self.query_ancestor(Conversation)) is not None:
+                conversation.shell.update_size(self._width, self._height)
 
     def on_mount(self) -> None:
         self.auto_links = False
