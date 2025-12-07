@@ -414,7 +414,7 @@ class Terminal(ScrollView, can_focus=True):
 
     @property
     def allow_select(self) -> bool:
-        return not self.is_finalized
+        return self.is_finalized or not self._alternate_screen
 
     def _encode_mouse_event_sgr(self, event: events.MouseEvent) -> str:
         x = int(event.x)

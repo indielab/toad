@@ -454,16 +454,15 @@ class Prompt(containers.VerticalGroup):
         if self.agent_ready:
             self.query_one(AgentInfo).update(agent_info)
         else:
-            self.query_one(AgentInfo).update("initializing…")
+            self.query_one(AgentInfo).update(
+                Content.assemble("Initializing ", agent_info, "…")
+            )
 
     def watch_multiline(self) -> None:
         self.update_prompt()
 
     def watch_shell_mode(self) -> None:
         self.update_prompt()
-
-    # def watch_project_path(self, path: Path) -> None:
-    #     pass
 
     def watch_working_directory(self, working_directory: str) -> None:
         out_of_bounds = not Path(working_directory).is_relative_to(self.project_path)
