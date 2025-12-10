@@ -278,17 +278,19 @@ class ToadApp(App, inherit_bindings=False):
 
     @cached_property
     def settings(self) -> Settings:
+        """App settings"""
         return Settings(
             self.settings_schema, self._settings, on_set_callback=self.setting_updated
         )
 
     @cached_property
     def anon_id(self) -> str:
+        """An anonymous ID for usage collection."""
         if not (anon_id := self.settings.get("anon_id", str, expand=False)):
+            # Create a random UUID on demand
             import uuid
 
-            anon_id = uuid.uuid4().hex
-
+            anon_id = str(uuid.uuid4())
             self.settings.set("anon_id", anon_id)
             self.save_settings()
             self.call_later(self.capture_event, "toad-install")
@@ -298,6 +300,12 @@ class ToadApp(App, inherit_bindings=False):
     async def capture_event(
         self, event_name: str, **properties: dict[str, Any]
     ) -> None:
+        """Capture an event.
+
+        Args:
+            event_name: Name of the event.
+            **properties: Additional data associated with the event.
+        """
         if not self.settings.get("statistics.allow_collect", bool):
             # User has disabled stats
             return
