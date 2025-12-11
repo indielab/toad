@@ -552,7 +552,6 @@ class Conversation(containers.Vertical):
             await self.shell_history.append(event.body)
             self.shell_history_index = 0
             await self.post_shell(event.body)
-            self.prompt.shell_mode = False
         elif text := event.body.strip():
             await self.prompt_history.append(event.body)
             self.prompt_history_index = 0

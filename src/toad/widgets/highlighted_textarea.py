@@ -122,23 +122,45 @@ class HighlightedTextArea(TextArea):
 
             language = self.highlight_language
             if language == "markdown":
-                content = highlight(
-                    text + "\n```",
-                    language="markdown",
-                    theme=TextualHighlightTheme,
-                )
-                content = content.highlight_regex(
-                    RE_MATCH_FILE_PROMPT, style="$primary"
-                )
+                content = self.highlight_markdown(text)
                 content_lines = content.split("\n", allow_blank=True)[:-1]
                 self._highlight_lines = content_lines
             elif language == "shell":
-                content = highlight(text, language="sh")
+                content = self.highlight_shell(text)
                 content_lines = content.split("\n", allow_blank=True)
                 self._highlight_lines = content_lines
             else:
                 raise ValueError("highlight_language must be `markdown` or `shell`")
         return self._highlight_lines
+
+    def highlight_markdown(self, text: str) -> Content:
+        """Highlight markdown content.
+
+        Args:
+            text: Text containing Markdown.
+
+        Returns:
+            Highlighted content.
+        """
+        content = highlight(
+            text + "\n```",
+            language="markdown",
+            theme=TextualHighlightTheme,
+        )
+        content = content.highlight_regex(RE_MATCH_FILE_PROMPT, style="$primary")
+        return content
+
+    def highlight_shell(self, text: str) -> Content:
+        """Highlight text with a bash shell command.
+
+        Args:
+            text: Text containing shell command.
+
+        Returns:
+            Highlighted content.
+        """
+        content = highlight(text, language="sh")
+        return content
 
     @on(TextArea.Changed)
     def _on_changed(self) -> None:

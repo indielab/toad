@@ -109,6 +109,9 @@ class PromptTextArea(HighlightedTextArea):
     suggestions: var[list[str] | None] = var(None)
     suggestions_index: var[int] = var(0)
 
+    project_path = var(Path())
+    working_directory = var("")
+
     class Submitted(Message):
         def __init__(self, markdown: str) -> None:
             self.markdown = markdown
@@ -119,6 +122,21 @@ class PromptTextArea(HighlightedTextArea):
 
     class CancelShell(Message):
         pass
+
+    def highlight_shell(self, text: str) -> Content:
+        """Override shell highlighting with additional danger detection."""
+        content = super().highlight_shell(text)
+
+        if not self.app.settings.get("shell.warn_dangerous", bool):
+            return content
+
+        from toad import danger
+
+        spans, _danger_level = danger.detect(
+            str(self.project_path), self.working_directory, content.plain
+        )
+        content = content.add_spans(spans)
+        return content
 
     def on_mount(self) -> None:
         self.highlight_cursor_line = False
@@ -725,6 +743,8 @@ class Prompt(containers.VerticalGroup):
                     multi_line=Prompt.multi_line,
                     shell_mode=Prompt.shell_mode,
                     agent_ready=Prompt.agent_ready,
+                    project_path=Prompt.project_path,
+                    working_directory=Prompt.working_directory,
                 )
 
         with containers.HorizontalGroup(id="info-container"):

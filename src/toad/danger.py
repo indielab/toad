@@ -1,6 +1,9 @@
 from enum import IntEnum
+from functools import lru_cache
 from pathlib import Path
-from typing import Iterable, NamedTuple
+from typing import Iterable, NamedTuple, Sequence
+
+from textual.content import Span
 
 
 SAFE_COMMANDS = {
@@ -119,14 +122,6 @@ UNSAFE_COMMANDS = {
     "scp",
     "install",
     # File Modification/Editing
-    "vi",
-    "vim",
-    "nvim",
-    "nano",
-    "emacs",
-    "ed",
-    "pico",
-    "gedit",
     "sed",  # with -i flag
     "awk",  # can write files
     "tee",  # writes to files and stdout
@@ -168,31 +163,6 @@ UNSAFE_COMMANDS = {
     "csplit",
     # Synchronization
     "sync",
-    # Package Managers (install/modify software)
-    "apt",
-    "apt-get",
-    "yum",
-    "dnf",
-    "pacman",
-    "zypper",
-    "brew",
-    "pip",
-    "pip3",
-    "npm",
-    "yarn",
-    "gem",
-    "cargo",
-    # Build/Compilation Tools
-    "make",
-    "cmake",
-    "gcc",
-    "g++",
-    "cc",
-    "clang",
-    "javac",
-    "python",  # can write files
-    "perl",  # can write files
-    "ruby",  # can write files
     # System Administration
     "useradd",
     "userdel",
@@ -207,22 +177,8 @@ UNSAFE_COMMANDS = {
     "parted",
     "swapon",
     "swapoff",
-    # Database/Content Management
-    "mysql",
-    "psql",
-    "sqlite3",
-    "mongo",
-    "redis-cli",
-    # Version Control (can write)
-    "git",
-    "svn",
-    "hg",
-    "cvs",
     # Other Potentially Dangerous
     "patch",
-    "cat",  # with redirection can overwrite
-    "echo",  # with redirection can overwrite
-    "printf",  # with redirection can overwrite
 }
 
 
@@ -248,16 +204,38 @@ class CommandAtom(NamedTuple):
     """Danger level."""
     path: Path
     """The path to which this command is expected to apply."""
+    span: tuple[int, int]
+    """Span to highlight error."""
 
 
+@lru_cache(maxsize=1024)
 def detect(
-    project_directory: str, current_working_directory: str, command_line: str
-) -> DangerLevel:
-    atoms = list(analyze(project_directory, current_working_directory, command_line))
-    print(atoms)
+    project_directory: str,
+    current_working_directory: str,
+    command_line: str,
+    *,
+    danger_style: str = "",
+    destructive_style: str = "$text-error on $error-muted 70%",
+) -> tuple[Sequence[Span], DangerLevel]:
+    try:
+        atoms = list(
+            analyze(project_directory, current_working_directory, command_line)
+        )
+    except OSError:
+        return [], DangerLevel.UNKNOWN
+    spans: list[Span] = []
+    for atom in atoms:
+        if atom.level == DangerLevel.DANGEROUS and danger_style:
+            spans.append(Span(*atom.span, danger_style))
+        elif atom.level == DangerLevel.DESTRUCTIVE and destructive_style:
+            spans.append(Span(*atom.span, destructive_style))
+
     if atoms:
-        return max(command_atom.level for command_atom in atoms)
-    return DangerLevel.SAFE
+        danger_level = max(command_atom.level for command_atom in atoms)
+    else:
+        danger_level = DangerLevel.SAFE
+
+    return (spans, danger_level)
 
 
 def analyze(
@@ -277,54 +255,89 @@ def analyze(
     import bashlex
     from bashlex import ast
 
-    def recurse_nodes(root_path: Path, nodes: list[node]) -> Iterable[CommandAtom]:
+    def recurse_nodes(root_path: Path, nodes: list[ast.node]) -> Iterable[CommandAtom]:
         for node in nodes:
-            print(node.kind)
-            if node.kind == "list":
+            kind: str = node.kind
+
+            if kind == "list":
                 yield from recurse_nodes(root_path, node.parts)
                 return
 
-            if node.kind == "operator":
+            if kind == "operator":
                 continue
 
-            command_name = node.parts[0].word
             level = DangerLevel.UNKNOWN
-            if command_name in SAFE_COMMANDS:
-                level = DangerLevel.SAFE
-            elif command_name in UNSAFE_COMMANDS:
-                level = DangerLevel.DANGEROUS
 
-            parts = node.parts[1:]
+            if not hasattr(node, "parts"):
+                continue
+
+            if node.parts:
+                command_name = command_line[slice(*node.parts[0].pos)]
+                if command_name in SAFE_COMMANDS:
+                    level = DangerLevel.SAFE
+                elif command_name in UNSAFE_COMMANDS:
+                    level = DangerLevel.DANGEROUS
+                parts = node.parts[1:]
+            else:
+                parts = node.parts
 
             if not parts:
-                yield CommandAtom(command_name, level, root_path)
+                yield CommandAtom(command_name, level, root_path, node.pos)
                 continue
 
             change_directory = command_name in CHANGE_DIRECTORY
 
             for command_node in parts:
                 command_word = command_line[slice(*node.pos)]
-                if command_node.kind == "command":
-                    yield from recurse_nodes(root_path, node.parts)
+
+                if command_node.kind == "redirect":
+                    redirect = command_line[slice(*command_node.output.pos)]
+                    try:
+                        target_path = (
+                            root_path / Path(redirect).expanduser()
+                        ).resolve()
+                    except OSError:
+                        continue
+                    if not target_path.is_relative_to(project_path):
+                        yield CommandAtom(
+                            "redirect",
+                            DangerLevel.DESTRUCTIVE,
+                            target_path,
+                            command_node.pos,
+                        )
                     continue
-                if command_node.word.startswith(("-", "+")):
+
+                if command_node.kind == "command":
+                    yield from recurse_nodes(root_path, command_node.parts)
+                    continue
+                if command_word.startswith(("-", "+")):
                     continue
                 word = command_line[slice(*command_node.pos)]
                 if change_directory:
-                    root_path = (root_path / word).resolve()
+                    try:
+                        root_path = (root_path / Path(word).expanduser()).resolve()
+                    except OSError:
+                        pass
                     continue
 
-                target_path = (root_path / word).resolve()
+                try:
+                    target_path = (root_path / Path(word).expanduser()).resolve()
+                except OSError:
+                    continue
                 if level == DangerLevel.DANGEROUS and not target_path.is_relative_to(
                     project_path
                 ):
                     # If refers to a path outside of the project, upgrade to destructive
                     level = DangerLevel.DESTRUCTIVE
 
-                yield CommandAtom(command_word, level, target_path)
+                yield CommandAtom(command_word, level, target_path, node.pos)
 
     current_path = Path(current_working_directory)
-    nodes = bashlex.parse(command_line)
+    try:
+        nodes = bashlex.parse(command_line)
+    except Exception:
+        # Failed to parse bash
+        return
 
     yield from recurse_nodes(current_path, nodes)
 
@@ -333,6 +346,14 @@ if __name__ == "__main__":
     import os
     from rich import print
 
-    TEST = ["ls;ls", "echo 'hello world'", "rm foo", "rm ../foo", "rm /"]
+    TEST = [
+        "ls;ls",
+        "echo 'hello world'",
+        "rm foo",
+        "rm ../foo",
+        "rm /",
+        "cat foo > ../foo.txt",
+    ]
+
     for test in TEST:
         print(repr(test), detect(os.getcwd(), os.getcwd(), test))
