@@ -286,11 +286,12 @@ class Conversation(containers.Vertical):
             return
 
         insert_text = (
-            f'@"{insert_path_text}" '
+            f'@"{insert_path_text}"'
             if " " in insert_path_text
-            else f"@{insert_path_text} "
+            else f"@{insert_path_text}"
         )
         self.prompt.prompt_text_area.insert(insert_text)
+        self.prompt.prompt_text_area.insert(" ")
 
     async def watch_shell_history_index(self, previous_index: int, index: int) -> None:
         if previous_index == 0:
