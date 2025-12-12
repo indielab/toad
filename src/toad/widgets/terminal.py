@@ -112,6 +112,10 @@ class Terminal(ScrollView, can_focus=True):
     def size(self) -> Size:
         return Size(self.width, self.height)
 
+    @property
+    def alternate_screen(self) -> bool:
+        return self._alternate_screen
+
     def set_state(self, state: ansi.TerminalState) -> None:
         """Set the terminal state, if this terminal is to inherit an existing state.
 
@@ -212,7 +216,6 @@ class Terminal(ScrollView, can_focus=True):
         Returns:
             `True` if the state visuals changed, `False` if no visual change.
         """
-
         scrollback_delta, alternate_delta = await self.state.write(text)
         self._update_from_state(scrollback_delta, alternate_delta)
         scrollback_changed = bool(scrollback_delta is None or scrollback_delta)
@@ -386,7 +389,6 @@ class Terminal(ScrollView, can_focus=True):
         self._escaping = False
 
     async def on_key(self, event: events.Key):
-        print(repr(event))
         event.prevent_default()
         event.stop()
 

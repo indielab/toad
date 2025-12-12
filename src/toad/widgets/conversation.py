@@ -59,6 +59,22 @@ if TYPE_CHECKING:
     from toad.widgets.terminal_tool import TerminalTool
 
 
+AGENT_FAIL_HELP = """\
+## Agent failed to run
+
+**The agent failed to start.**
+
+Check that the agent is installed and up-to-date.
+
+- Exit the app, and run `toad` agin
+- Select the agent and hit ENTER
+- Click the dropdown, select "Install"
+- Click the GO button
+
+If that fails, please file a bug!
+"""
+
+
 class Loading(Static):
     """Tiny widget to show loading indicator."""
 
@@ -261,6 +277,21 @@ class Conversation(containers.Vertical):
 
     def shell_complete(self, prefix: str) -> list[str]:
         return self.shell_history.complete(prefix)
+
+    def insert_path_into_prompt(self, path: Path) -> None:
+        try:
+            insert_path_text = str(path.relative_to(self.project_path))
+        except Exception:
+            self.app.bell()
+            return
+
+        insert_text = (
+            f'@"{insert_path_text}"'
+            if " " in insert_path_text
+            else f"@{insert_path_text}"
+        )
+        self.prompt.prompt_text_area.insert(insert_text)
+        self.prompt.prompt_text_area.insert(" ")
 
     async def watch_shell_history_index(self, previous_index: int, index: int) -> None:
         if previous_index == 0:
@@ -513,6 +544,10 @@ class Conversation(containers.Vertical):
             error = Content.from_markup(message.details.strip()).stylize("$text-error")
         await self.post(Note(error, classes="-error"))
 
+        from toad.widgets.markdown_note import MarkdownNote
+
+        await self.post(MarkdownNote(AGENT_FAIL_HELP))
+
     @on(messages.WorkStarted)
     def on_work_started(self) -> None:
         self.busy_count += 1
@@ -593,6 +628,7 @@ class Conversation(containers.Vertical):
             await self._loading.remove()
         self._agent_response = None
         self._agent_thought = None
+        self.post_message(messages.ProjectDirectoryUpdated())
 
     @on(Menu.OptionSelected)
     async def on_menu_option_selected(self, event: Menu.OptionSelected) -> None:
@@ -1086,6 +1122,8 @@ class Conversation(containers.Vertical):
 
         if self._terminal is not None:
             self._terminal.finalize()
+            if self._terminal.state.buffer.is_blank:
+                await self._terminal.remove()
         terminal_width, terminal_height = self.get_terminal_dimensions()
         terminal = ShellTerminal(
             size=(terminal_width, terminal_height),
@@ -1149,6 +1187,7 @@ class Conversation(containers.Vertical):
             await self.post(ShellResult(command))
             width, height = self.get_terminal_dimensions()
             await self.shell.send(command, width, height)
+            self.post_message(messages.ProjectDirectoryUpdated())
 
     def action_cursor_up(self) -> None:
         if not self.contents.displayed_children or self.cursor_offset == 0:

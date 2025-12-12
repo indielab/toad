@@ -13,7 +13,7 @@ publisher_url = "https://willmcgugan.github.io/"
 type = "coding"
 description = "Lightweight coding agent by OpenAI that runs in your terminal with native ACP support."
 tags = []
-run_command."*" = "codex-acp"
+run_command."*" = "npx @zed-industries/codex-acp"
 
 help = '''
 # Codex CLI
@@ -51,7 +51,3 @@ For ACP adapter (used by editors): Install from https://github.com/zed-industrie
 [actions."*".install]
 command = "npm install -g @openai/codex"
 description = "Install Codex CLI"
-
-[actions."*".install_homebrew]
-command = "brew install --cask codex"
-description = "Install Codex CLI via Homebrew"

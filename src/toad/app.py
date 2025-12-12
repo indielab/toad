@@ -13,6 +13,7 @@ from textual.reactive import var, reactive
 from textual.app import App
 from textual.signal import Signal
 
+
 from posthog import Posthog
 
 from toad.settings import Schema, Settings
@@ -26,6 +27,12 @@ if TYPE_CHECKING:
     from toad.screens.main import MainScreen
     from toad.screens.settings import SettingsScreen
     from toad.screens.store import StoreScreen
+
+
+import warnings
+
+# TODO: Look in to Posthog Syntax warnings
+warnings.filterwarnings("ignore", category=SyntaxWarning)
 
 
 DRACULA_TERMINAL_THEME = terminal_theme.TerminalTheme(

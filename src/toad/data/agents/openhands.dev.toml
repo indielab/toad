@@ -11,7 +11,7 @@ author_url = "https://openhands.dev/"
 publisher_name = "Will McGugan"
 publisher_url = "https://willmcgugan.github.io/"
 type = "coding"
-description = "The open platform for cloud coding agents"
+description = "The open platform for cloud coding agents.\nScale from one to thousands of agents — open source, model-agnostic, and enterprise-ready."
 tags = []
 run_command."*" = "openhands acp"
 recommended = true
@@ -38,7 +38,7 @@ Visit [openhands-dev](https://openhands.dev/) for more information.
 '''
 
 [actions."*".install]
-command = "uv tool install openhands -U --python 3.12 && openhands"
+command = "uv tool install openhands -U --python 3.12"
 bootstral_uv = true
 description = "Install OpenHands"
 

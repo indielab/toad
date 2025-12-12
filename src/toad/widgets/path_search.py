@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from os import PathLike
+
 from operator import itemgetter
 from pathlib import Path
 import re
 from typing import Sequence
+
+import pathspec.patterns
+from pathspec import PathSpec
 
 from textual import on
 from textual.app import ComposeResult
@@ -14,8 +17,8 @@ from textual import getters
 from textual import containers
 from textual.reactive import var, Initialize
 from textual.content import Content, Span
-
 from textual.fuzzy import FuzzySearch
+from textual.widget import Widget
 from textual.widgets import OptionList, Input
 from textual.widgets.option_list import Option
 
@@ -132,6 +135,27 @@ class PathSearch(containers.VerticalGroup):
     def watch_root(self, root: Path) -> None:
         pass
 
+    @work(thread=True)
+    async def get_path_spec(self, git_ignore_path: Path) -> PathSpec | None:
+        """Get a path spec instance if there is a .gitignore file present.
+
+        Args:
+            git_ignore_path): Path to .gitignore.
+
+        Returns:
+            A `PathSpec` instance.
+        """
+        try:
+            if git_ignore_path.is_file():
+                spec_text = git_ignore_path.read_text()
+                spec = PathSpec.from_lines(
+                    pathspec.patterns.GitWildMatchPattern, spec_text.splitlines()
+                )
+                return spec
+        except OSError:
+            return None
+        return None
+
     @work(exclusive=True)
     async def load_paths(self) -> None:
         self.input.clear()
@@ -139,12 +163,20 @@ class PathSearch(containers.VerticalGroup):
         root = self.root
 
         self.loading = True
-        paths = await directory.scan(root, exclude_dirs=[".*", "__*__"])
+
+        path_spec = await self.get_path_spec(root / ".gitignore").wait()
+        paths = await directory.scan(root, path_spec=path_spec)
+
         paths = [path.absolute() for path in paths]
         paths.sort(key=lambda path: (len(path.parts), str(path)))
         self.root = root
         self.paths = paths
         self.loading = False
+
+    def get_loading_widget(self) -> Widget:
+        from textual.widgets import LoadingIndicator
+
+        return LoadingIndicator()
 
     def highlight_path(self, path: str) -> Content:
         if path.startswith("."):
