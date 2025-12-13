@@ -343,7 +343,7 @@ Prompt {
     
     # }
 
-    PathSearch {
+    PathSearch, SlashComplete {
         display: none;
         height: auto;
         Input {
@@ -362,9 +362,16 @@ Prompt {
         }
     }
 
+
     &.-show-path-search {
         PathSearch {
             display: block
+        }
+    }
+
+    &.-show-slash-complete {
+        SlashComplete {
+            display: block;
         }
     }
 
@@ -458,25 +465,27 @@ Prompt {
 
 }
 
-AutoCompleteOptions {    
-    max-height: 50vh;
+# AutoCompleteOptions {    
+#     max-height: 50vh;
     
-    border: none;
-    padding: 0;
-    width: auto;
-    max-width: 100;
+#     border: none;
+#     padding: 0;
+#     width: auto;
+#     max-width: 100;
     
-    overlay: screen;
-    overflow: hidden;
-    constrain: inside inflect;    
-    min-width: 12;    
-    margin: 1 0;
-    height: auto;    
+#     overlay: screen;
+#     overflow: hidden;
+#     constrain: inside inflect;    
+#     min-width: 12;    
+#     margin: 1 0;
+#     height: auto;    
         
-    & > .option-list--option {
-        padding: 0 1;
-    }
-}
+#     & > .option-list--option {
+#         padding: 0 1;
+#     }
+# }
+
+
 
 ModeInfo:hover {
     text-style: underline;

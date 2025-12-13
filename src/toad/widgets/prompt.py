@@ -28,15 +28,12 @@ from toad.widgets.condensed_path import CondensedPath
 from toad.widgets.path_search import PathSearch
 from toad.widgets.plan import Plan
 from toad.widgets.question import Ask, Question
+from toad.widgets.slash_complete import SlashComplete
 from toad.messages import UserInputSubmitted
 from toad.slash_command import SlashCommand
 from toad.prompt.extract import extract_paths_from_prompt
 from toad.acp.agent import Mode
 from toad.path_complete import PathComplete
-
-
-class AutoCompleteOptions(OptionList, can_focus=False):
-    """A list of auto complete options (slash commands)."""
 
 
 class ModeSwitcher(OptionList):
@@ -52,6 +49,10 @@ class ModeSwitcher(OptionList):
 
 
 class InvokeFileSearch(Message):
+    pass
+
+
+class InvokeSlashComplete(Message):
     pass
 
 
@@ -158,19 +159,14 @@ class PromptTextArea(HighlightedTextArea):
 
     def update_suggestion(self) -> None:
         prompt = self.query_ancestor(Prompt)
-        if self.selection.start == self.selection.end and self.text.startswith("/"):
-            cursor_row, cursor_column = prompt.prompt_text_area.selection.end
-            line = prompt.prompt_text_area.document.get_line(cursor_row)
-            post_cursor = line[cursor_column:]
-            pre_cursor = line[:cursor_column]
-            prompt.load_suggestions(pre_cursor, post_cursor)
-        else:
-            self.query_ancestor(Prompt).show_auto_completes = False
 
-            if self.shell_mode and self.cursor_at_end_of_text and "\n" not in self.text:
-                if prompt.complete_callback is not None:
-                    if completes := prompt.complete_callback(self.text):
-                        self.suggestion = completes[-1]
+        if self.selection.start == self.selection.end and self.text.startswith("/"):
+            return
+
+        if self.shell_mode and self.cursor_at_end_of_text and "\n" not in self.text:
+            if prompt.complete_callback is not None:
+                if completes := prompt.complete_callback(self.text):
+                    self.suggestion = completes[-1]
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action == "newline" and self.multi_line:
@@ -224,30 +220,20 @@ class PromptTextArea(HighlightedTextArea):
         self.clear()
 
     def action_cursor_up(self, select: bool = False):
-        if self.auto_completes:
-            self.post_message(Prompt.AutoCompleteMove(-1))
-        else:
-            if self.selection.is_empty and not select:
-                row, _column = self.selection[0]
-                if row == 0 and self.shell_mode:
-                    self.post_message(
-                        messages.HistoryMove(-1, self.shell_mode, self.text)
-                    )
-                    return
-            super().action_cursor_up(select)
+        if self.selection.is_empty and not select:
+            row, _column = self.selection[0]
+            if row == 0 and self.shell_mode:
+                self.post_message(messages.HistoryMove(-1, self.shell_mode, self.text))
+                return
+        super().action_cursor_up(select)
 
     def action_cursor_down(self, select: bool = False):
-        if self.auto_completes:
-            self.post_message(Prompt.AutoCompleteMove(+1))
-        else:
-            if self.selection.is_empty and not select:
-                row, _column = self.selection[0]
-                if row == (self.wrapped_document.height - 1) and self.shell_mode:
-                    self.post_message(
-                        messages.HistoryMove(+1, self.shell_mode, self.text)
-                    )
-                    return
-            super().action_cursor_down(select)
+        if self.selection.is_empty and not select:
+            row, _column = self.selection[0]
+            if row == (self.wrapped_document.height - 1) and self.shell_mode:
+                self.post_message(messages.HistoryMove(+1, self.shell_mode, self.text))
+                return
+        super().action_cursor_down(select)
 
     def action_delete_left(self) -> None:
         selection = self.selection
@@ -329,6 +315,11 @@ class PromptTextArea(HighlightedTextArea):
             else:
                 direction = 0
             line = self.document.get_line(y)
+
+            if x == 1 and direction == +1 and line[0] == "/":
+                self.post_message(InvokeSlashComplete())
+                return
+
             for _path, start, end in extract_paths_from_prompt(line):
                 if x > start and x < end:
                     self.selection = Selection((y, start), (y, end))
@@ -358,16 +349,15 @@ class Prompt(containers.VerticalGroup):
     prompt_label = getters.query_one("#prompt", Label)
     current_directory = getters.query_one(CondensedPath)
     path_search = getters.query_one(PathSearch)
+    slash_complete = getters.query_one(SlashComplete)
     question = getters.query_one(Question)
-    auto_complete = getters.query_one(AutoCompleteOptions)
     mode_switcher = getters.query_one(ModeSwitcher)
 
-    auto_completes: var[list[Option]] = var(list)
-    show_auto_completes: var[bool] = var(False, bindings=True)
     slash_commands: var[list[SlashCommand]] = var(list)
     shell_mode = var(False)
     multi_line = var(False)
-    show_path_search = var(False, toggle_class="-show-path-search")
+    show_path_search = var(False, toggle_class="-show-path-search", bindings=True)
+    show_slash_complete = var(False, toggle_class="-show-slash-complete", bindings=True)
     project_path = var(Path())
     working_directory = var("")
     agent_info = var(Content(""))
@@ -378,10 +368,6 @@ class Prompt(containers.VerticalGroup):
     modes: var[dict[str, Mode] | None] = var(None)
 
     app = getters.app(ToadApp)
-
-    @dataclass
-    class AutoCompleteMove(Message):
-        direction: int
 
     def __init__(
         self,
@@ -415,11 +401,6 @@ class Prompt(containers.VerticalGroup):
             )
             self.query_one(ModeInfo).with_tooltip(tooltip).update(mode.name)
         self.watch_modes(self.modes)
-
-    def watch_show_auto_completes(self, show: bool) -> None:
-        self.auto_complete.display = show
-        if not show:
-            self.prompt_text_area.suggestion = ""
 
     def ask(self, ask: Ask) -> None:
         """Replace the textarea prompt with a menu of options.
@@ -465,7 +446,7 @@ class Prompt(containers.VerticalGroup):
     def watch_agent_ready(self, ready: bool) -> None:
         self.set_class(not ready, "-not-ready")
         if ready:
-            self.prompt_text_area.focus()
+            # self.prompt_text_area.focus()
             self.query_one(AgentInfo).update(self.agent_info)
 
     def watch_agent_info(self, agent_info: Content) -> None:
@@ -562,45 +543,11 @@ class Prompt(containers.VerticalGroup):
             text, maintain_selection_offset=False
         )
 
-    def watch_auto_completes(self, auto_complete: list[Option]) -> None:
-        if auto_complete:
-            self.auto_complete.set_options(auto_complete)
-            self.auto_complete.action_cursor_down()
-            if (
-                highlighted_option := self.auto_complete.highlighted_option
-            ) is not None and highlighted_option.id:
-                self.suggest(highlighted_option.id)
-            self.show_auto_completes = True
-        else:
-            self.auto_complete.clear_options()
-            self.show_auto_completes = False
-
     def watch_show_path_search(self, show: bool) -> None:
         self.prompt_text_area.suggestion = ""
 
-    def set_auto_completes(self, auto_completes: list[Option] | None) -> None:
-        self.auto_completes = auto_completes.copy() if auto_completes else []
-        if self.auto_completes:
-            self.update_auto_complete_location()
-
-    @on(HighlightedTextArea.CursorMove)
-    def on_cursor_move(self, event: HighlightedTextArea.CursorMove) -> None:
-        selection = event.selection
-        if selection.end != selection.start:
-            self.show_auto_completes = False
-            return
-
-        self.show_auto_completes = (
-            self.prompt_text_area.cursor_at_end_of_line or not self.text
-        ) and bool(self.auto_completes)
-
-        self.update_auto_complete_location()
-        event.stop()
-
-    def update_auto_complete_location(self):
-        if self.auto_complete.display:
-            cursor_offset = (self.prompt_text_area.cursor_screen_offset) + (-2, 0)
-            self.auto_complete.absolute_offset = cursor_offset
+    def watch_show_slash_complete(self, show: bool) -> None:
+        self.slash_complete.focus()
 
     @on(PromptTextArea.RequestShellMode)
     def on_request_shell_mode(self, event: PromptTextArea.RequestShellMode):
@@ -617,19 +564,6 @@ class Prompt(containers.VerticalGroup):
             self.shell_mode = True
 
         self.update_prompt()
-        cursor_row, cursor_column = self.prompt_text_area.selection.end
-        line = self.prompt_text_area.document.get_line(cursor_row)
-        post_cursor = line[cursor_column:]
-        pre_cursor = line[:cursor_column]
-        self.load_suggestions(pre_cursor, post_cursor)
-
-    @on(AutoCompleteMove)
-    def on_auto_complete_move(self, event: AutoCompleteMove) -> None:
-        if self.auto_complete.display:
-            if event.direction == -1:
-                self.auto_complete.action_cursor_up()
-            else:
-                self.auto_complete.action_cursor_down()
 
     @on(PromptTextArea.CancelShell)
     def on_cancel_shell(self, event: PromptTextArea.CancelShell):
@@ -641,15 +575,29 @@ class Prompt(containers.VerticalGroup):
         self.show_path_search = True
         self.path_search.load_paths()
 
+    @on(InvokeSlashComplete)
+    def on_invoke_slash_complete(self, event: InvokeSlashComplete) -> None:
+        event.stop()
+        self.show_slash_complete = True
+
     @on(messages.PromptSuggestion)
     def on_prompt_suggestion(self, event: messages.PromptSuggestion) -> None:
         event.stop()
         self.prompt_text_area.suggestion = event.suggestion
 
+    @on(SlashComplete.Completed)
+    def on_slash_complete_completed(self, event: SlashComplete.Completed) -> None:
+        self.prompt_text_area.clear()
+        self.prompt_text_area.insert(f"{event.command} ")
+
     @on(messages.Dismiss)
     def on_dismiss(self, event: messages.Dismiss) -> None:
         event.stop()
-        if event.widget is self.path_search:
+        if event.widget is self.slash_complete:
+            self.show_slash_complete = False
+            self.prompt_text_area.suggestion = ""
+            self.focus()
+        elif event.widget is self.path_search:
             self.show_path_search = False
             self.focus()
 
@@ -688,59 +636,23 @@ class Prompt(containers.VerticalGroup):
         if suggestion.startswith(self.text) and self.text != suggestion:
             self.prompt_text_area.suggestion = suggestion[len(self.text) :]
 
-    def load_suggestions(self, pre_cursor: str, post_cursor: str) -> None:
-        if post_cursor.strip():
-            self.set_auto_completes(None)
-            return
-        pre_cursor = pre_cursor.casefold()
-        post_cursor = post_cursor.casefold()
-        suggestions: list[Option] = []
+    # @on(events.DescendantBlur, "PromptTextArea")
+    # def on_descendant_blur(self, event: events.DescendantBlur) -> None:
+    #     self.auto_complete.visible = False
 
-        if not pre_cursor:
-            self.set_auto_completes(None)
-            return
-
-        from toad.visuals.columns import Columns
-
-        columns = Columns("auto", "flex")
-
-        if not self.is_shell_mode:
-            # Claude can send duplicated slash commands https://github.com/Textualize/toad/discussions/65
-            deduplicated_slash_commands = {
-                slash_command.command: slash_command
-                for slash_command in self.slash_commands
-            }
-            for slash_command in deduplicated_slash_commands.values():
-                command_name = slash_command.command
-                if command_name.casefold().startswith(pre_cursor) and pre_cursor != str(
-                    slash_command
-                ):
-                    row = columns.add_row(
-                        Content.styled(command_name, "$text-success"),
-                        Content.styled(slash_command.help, "dim"),
-                    )
-                    suggestions.append(Option(row, id=command_name))
-
-        self.set_auto_completes(suggestions)
-
-    @on(events.DescendantBlur, "PromptTextArea")
-    def on_descendant_blur(self, event: events.DescendantBlur) -> None:
-        self.auto_complete.visible = False
-
-    @on(events.DescendantFocus, "PromptTextArea")
-    def on_descendant_focus(self, event: events.DescendantFocus) -> None:
-        self.auto_complete.visible = True
+    # @on(events.DescendantFocus, "PromptTextArea")
+    # def on_descendant_focus(self, event: events.DescendantFocus) -> None:
+    #     self.auto_complete.visible = True
 
     def compose(self) -> ComposeResult:
-        yield AutoCompleteOptions()
         yield PathSearch().data_bind(root=Prompt.project_path)
+        yield SlashComplete().data_bind(slash_commands=Prompt.slash_commands)
 
         with containers.HorizontalGroup(id="prompt-container"):
             yield Question()
             with containers.HorizontalGroup(id="text-prompt"):
                 yield Label(self.PROMPT_AI, id="prompt")
                 yield PromptTextArea().data_bind(
-                    auto_completes=Prompt.auto_completes,
                     multi_line=Prompt.multi_line,
                     shell_mode=Prompt.shell_mode,
                     agent_ready=Prompt.agent_ready,
@@ -755,8 +667,6 @@ class Prompt(containers.VerticalGroup):
             yield ModeInfo("mode")
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        if action == "dismiss":
-            return True if (self.shell_mode or self.show_auto_completes) else False
         return True
 
     def action_dismiss(self) -> None:
@@ -765,7 +675,7 @@ class Prompt(containers.VerticalGroup):
             return
         if self.shell_mode:
             self.shell_mode = False
-        elif self.show_auto_completes:
-            self.show_auto_completes = False
+        elif self.show_slash_complete:
+            self.show_slash_complete = False
         else:
             raise SkipAction()
