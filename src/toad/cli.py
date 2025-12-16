@@ -50,7 +50,22 @@ def main():
 @main.command("run")
 @click.argument("project_dir", metavar="PATH", required=False, default=".")
 @click.option("-a", "--agent", metavar="AGENT", default="")
-def run(project_dir: str = ".", agent: str = "1"):
+@click.option(
+    "--port",
+    metavar="PORT",
+    default=8000,
+    type=int,
+    help="Port to use in conjunction with --serve",
+)
+@click.option(
+    "--host",
+    metavar="HOST",
+    default="localhost",
+    type=str,
+    help="Host to use in conjunction with --serve",
+)
+@click.option("--serve", is_flag=True, help="Serve Toad as a web application")
+def run(port: int, host: str, serve: bool, project_dir: str = ".", agent: str = "1"):
     """Run an agent (with also run with `toad PATH`)."""
     # if ctx.invoked_subcommand is not None:
     #     return
@@ -67,7 +82,25 @@ def run(project_dir: str = ".", agent: str = "1"):
         agent_data=agent_data,
         project_dir=project_dir,
     )
-    app.run()
+    if serve:
+        import shlex
+        from textual_serve.server import Server
+
+        command_args = sys.argv
+        try:
+            command_args.remove("--serve")
+        except ValueError:
+            pass
+        serve_command = shlex.join(command_args)
+        server = Server(
+            serve_command,
+            host=host,
+            port=port,
+            title=serve_command,
+        )
+        server.serve()
+    else:
+        app.run()
     app.run_on_exit()
 
 
@@ -123,7 +156,6 @@ def acp(
         "run_command": {"*": command},
         "actions": {},
     }
-    app = ToadApp(agent_data=agent_data, project_dir=project_dir)
     if serve:
         import shlex
         from textual_serve.server import Server
@@ -141,8 +173,9 @@ def acp(
         )
         server.serve()
     else:
+        app = ToadApp(agent_data=agent_data, project_dir=project_dir)
         app.run()
-    app.run_on_exit()
+        app.run_on_exit()
 
     from rich import print
 
