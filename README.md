@@ -111,7 +111,9 @@ To discuss Toad, see the Discussions tab, or join the #toad channel on the [Text
 Some features still to do:
 
 - UI for MCP servers
-- Expose models selection (waiting on ACP update)
+- Expose model selection (waiting on ACP update)
+- Sessions
+- Multiple agents
 
 ### Reporting bugs
 
@@ -119,6 +121,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Dicussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
