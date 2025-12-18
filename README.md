@@ -40,7 +40,17 @@ The easiest way to install Toad is by pasting the following in to your terminal:
 curl -fsSL batrachian.ai/install | sh
 ```
 
-Python developers may prefer to install with the following (assumes you have [uv](https://docs.astral.sh/uv/) installed):
+You should now have `toad` installed.
+
+If that doesn't work for any reason, then you can install with the following steps:
+
+Fist [install UV](https://docs.astral.sh/uv/getting-started/installation/):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then use UV to install toad:
 
 ```bash
 uv tool install -U batrachian-toad
@@ -121,6 +131,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Dicussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
