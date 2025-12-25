@@ -267,7 +267,7 @@ class StoreScreen(Screen):
                 yield Mandelbrot()
                 yield widgets.Label(self.get_info(), id="info")
 
-        yield Container(id="container")
+        yield Container(id="container", can_focus=False)
         yield widgets.Footer()
 
     def get_info(self) -> Content:
@@ -334,6 +334,20 @@ class StoreScreen(Screen):
             with AgentGridSelect(classes="agents-picker", min_column_width=40):
                 for agent in chat_bots:
                     yield AgentItem(agent)
+
+    @on(GridSelect.LeaveUp)
+    def on_grid_select_leave_up(self, event: GridSelect.LeaveUp):
+        event.stop()
+        widget_up = self.screen._move_focus(-1)
+        if isinstance(widget_up, GridSelect):
+            widget_up.highlight_last()
+
+    @on(GridSelect.LeaveDown)
+    def on_grid_select_leave_down(self, event: GridSelect.LeaveUp):
+        event.stop()
+        widget_up = self.screen._move_focus(+1)
+        if isinstance(widget_up, GridSelect):
+            widget_up.highlight_first()
 
     @on(GridSelect.Selected, ".agents-picker")
     @work
@@ -410,10 +424,18 @@ class StoreScreen(Screen):
                 first_grid = self.container.query(GridSelect).first()
                 first_grid.focus(scroll_visible=False)
 
-    def setting_updated(self, setting: tuple[str, object]) -> None:
+    async def setting_updated(self, setting: tuple[str, object]) -> None:
         key, value = setting
         if key == "launcher.agents":
-            self.launcher.refresh(recompose=True)
+            await self.launcher.recompose()
+
+            def focus_screen():
+                try:
+                    self.screen.query(GridSelect).focus()
+                except Exception:
+                    pass
+
+            self.call_later(focus_screen)
 
     def on_key(self, event: events.Key) -> None:
         if event.character is None:

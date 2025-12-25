@@ -144,7 +144,7 @@ class MainScreen(Screen, can_focus=False):
         for tree in self.query("#project_directory_tree").results(DirectoryTree):
             tree.data_bind(path=MainScreen.project_path)
         for tree in self.query(DirectoryTree):
-            tree.show_guides = False
+            #     tree.show_guides = False
             tree.guide_depth = 3
 
     @on(OptionList.OptionHighlighted)

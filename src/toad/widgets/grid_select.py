@@ -32,6 +32,14 @@ class GridSelect(containers.ItemGrid, can_focus=True):
         def control(self) -> Widget:
             return self.grid_select
 
+    @dataclass
+    class LeaveUp(Message):
+        grid_select: "GridSelect"
+
+    @dataclass
+    class LeaveDown(Message):
+        grid_select: "GridSelect"
+
     def __init__(
         self,
         name: str | None = None,
@@ -53,17 +61,13 @@ class GridSelect(containers.ItemGrid, can_focus=True):
         assert isinstance(self.layout, GridLayout)
         return self.layout.grid_size
 
-    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        if action in {"cursor_up", "cursor_down", "cursor_left", "cursor_right"}:
-            return (
-                None
-                if (
-                    (self.grid_size is None or self.highlighted is None)
-                    or len(self.children) <= 1
-                )
-                else True
-            )
-        return True
+    def highlight_first(self) -> None:
+        self.highlighted = 0
+
+    def highlight_last(self) -> None:
+        if (grid_size := self.grid_size) is not None:
+            width, height = grid_size
+            self.highlighted = (height - 1) * width
 
     def on_focus(self):
         if self.highlighted is None:
@@ -114,6 +118,7 @@ class GridSelect(containers.ItemGrid, can_focus=True):
 
     def action_cursor_up(self):
         if (grid_size := self.grid_size) is None:
+            self.post_message(self.LeaveUp(self))
             return
         if self.highlighted is None:
             self.highlighted = 0
@@ -121,16 +126,22 @@ class GridSelect(containers.ItemGrid, can_focus=True):
             width, _height = grid_size
             if self.highlighted >= width:
                 self.highlighted -= width
+            else:
+                self.post_message(self.LeaveUp(self))
 
     def action_cursor_down(self):
         if (grid_size := self.grid_size) is None:
+            self.post_message(self.LeaveDown(self))
             return
+
         if self.highlighted is None:
             self.highlighted = 0
         else:
             width, height = grid_size
             if self.highlighted + width < len(self.children):
                 self.highlighted += width
+            else:
+                self.post_message(self.LeaveDown(self))
 
     def action_cursor_left(self):
         if self.highlighted is None:
