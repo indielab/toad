@@ -8,26 +8,6 @@ from pathspec import GitIgnoreSpec
 import rich.repr
 
 
-def get_git_root(path: Path) -> Path | None:
-    """Get the git root.
-
-    Args:
-        path: Path to locate git root.
-
-    Returns:
-        A `Path` for the directory containing the .git directory, or `None` if it wasn't found.
-    """
-
-    try:
-        while (parent := path.parent) != parent:
-            if (path / ".git").is_dir():
-                return path
-            path = parent
-    except OSError:
-        return None
-    return None
-
-
 def load_path_spec(git_ignore_path: Path) -> GitIgnoreSpec | None:
     """Get a path spec instance if there is a .gitignore file present.
 
