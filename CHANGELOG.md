@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Cursor keys can navigate between sections in the store screen
 - Optimized path search
-- Disabled path seartch in shell mode
+- Disabled path search in shell mode
 - Typing in the conversation view will auto-focus the prompt
 
 ### Added
