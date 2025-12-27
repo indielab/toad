@@ -66,7 +66,7 @@ toad
 
 You should see something like this:
 
-<img width="1266" height="994" alt="front-fs8" src="https://github.com/user-attachments/assets/8831f7de-5349-4b3f-9de9-d4565b513108" />
+<img alt="front-fs8" src="https://github.com/user-attachments/assets/8831f7de-5349-4b3f-9de9-d4565b513108" />
 
 From this screen you will be able to find, install, and launch a coding agent.
 If you already have an agent installed, you can skip the install step.
@@ -132,6 +132,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Dicussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
