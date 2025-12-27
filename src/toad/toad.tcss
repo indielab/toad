@@ -381,14 +381,14 @@ Prompt {
 
     PathSearch, SlashComplete {
         display: none;
-        height: auto;
+        height: 16;
         Input {
             margin: 0 1;
             padding: 0 1;
         }
         OptionList {
             border: none;
-            height: 10;           
+            height: 16;           
             padding: 0;
             margin: 0 1;                     
             overflow: hidden;
@@ -398,6 +398,10 @@ Prompt {
                 padding: 0 1;    
          
             }
+        }
+        DirectoryTree {
+            margin: 0 1;
+            padding: 0 0 0 1;
         }
     }
 

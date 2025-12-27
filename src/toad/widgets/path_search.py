@@ -16,10 +16,13 @@ from textual import work
 from textual import getters
 from textual import containers
 from textual import events
+from textual.actions import SkipAction
+
 from textual.reactive import var, Initialize
 from textual.content import Content, Span
 from textual.widget import Widget
-from textual.widgets import OptionList, Input
+from textual import widgets
+from textual.widgets import OptionList, Input, DirectoryTree
 from textual.widgets.option_list import Option
 
 
@@ -71,6 +74,31 @@ class PathFuzzySearch(FuzzySearch):
         return score
 
 
+class FuzzyInput(Input):
+    def render_line(self, y: int) -> Strip:
+        from textual.strip import Strip
+
+        if y == 0 and not self.value:
+            placeholder = Content.from_markup(self.placeholder).expand_tabs()
+            placeholder = placeholder.stylize(self.visual_style)
+            placeholder = placeholder.stylize(
+                self.get_visual_style("input--placeholder")
+            )
+            if self.has_focus:
+                cursor_style = self.get_visual_style("input--cursor")
+                if self._cursor_visible:
+                    # If the placeholder is empty, there's no characters to stylise
+                    # to make the cursor flash, so use a single space character
+                    if len(placeholder) == 0:
+                        placeholder = Content(" ")
+                    placeholder = placeholder.stylize(cursor_style, 0, 1)
+
+            strip = Strip(placeholder.render_segments())
+            return strip
+
+        return super().render_line(y)
+
+
 class PathSearch(containers.VerticalGroup):
     CURSOR_BINDING_GROUP = Binding.Group(description="Move selection")
     BINDINGS = [
@@ -86,6 +114,7 @@ class PathSearch(containers.VerticalGroup):
         ),
         Binding("enter", "submit", "Insert path", priority=True),
         Binding("escape", "dismiss", "Dismiss", priority=True),
+        Binding("tab", "switch_picker", "Switch picker", priority=True),
     ]
 
     def get_fuzzy_search(self) -> FuzzySearch:
@@ -98,13 +127,40 @@ class PathSearch(containers.VerticalGroup):
     loaded = var(False)
     filter = var("")
     fuzzy_search: var[FuzzySearch] = var(Initialize(get_fuzzy_search))
+    show_tree_picker: var[bool] = var(False)
+    tree_path = var("")
 
     option_list = getters.query_one(OptionList)
+    tree_view = getters.query_one(DirectoryTree)
     input = getters.query_one(Input)
 
     def compose(self) -> ComposeResult:
-        yield Input(compact=True, placeholder="fuzzy search")
-        yield OptionList()
+        with widgets.ContentSwitcher(initial="path-search-fuzzy"):
+            with containers.VerticalGroup(id="path-search-fuzzy"):
+                yield FuzzyInput(
+                    compact=True, placeholder="fuzzy search \t[r]▌tab▐[/r] tree picker"
+                )
+                yield OptionList()
+            yield DirectoryTree(self.root, id="path-search-tree")
+
+    def on_mount(self) -> None:
+        tree = self.query_one(DirectoryTree)
+        tree.show_root = False
+        tree.guide_depth = 2
+        tree.center_scroll = True
+
+    def watch_show_tree_picker(self, show_tree_picker: bool) -> None:
+        content_switcher = self.query_one(widgets.ContentSwitcher)
+        content_switcher.current = (
+            "path-search-tree" if show_tree_picker else "path-search-fuzzy"
+        )
+        if show_tree_picker:
+            self.tree_view.focus()
+        else:
+            self.input.focus()
+
+    def action_switch_picker(self) -> None:
+        self.show_tree_picker = not self.show_tree_picker
 
     async def search(self, search: str) -> None:
         if not search:
@@ -149,10 +205,16 @@ class PathSearch(containers.VerticalGroup):
         self.post_message(PromptSuggestion(""))
 
     def action_cursor_down(self) -> None:
-        self.option_list.action_cursor_down()
+        if self.show_tree_picker:
+            self.tree_view.action_cursor_down()
+        else:
+            self.option_list.action_cursor_down()
 
     def action_cursor_up(self) -> None:
-        self.option_list.action_cursor_up()
+        if self.show_tree_picker:
+            self.tree_view.action_cursor_up()
+        else:
+            self.option_list.action_cursor_up()
 
     def action_dismiss(self) -> None:
         self.post_message(Dismiss(self))
@@ -160,7 +222,37 @@ class PathSearch(containers.VerticalGroup):
     def focus(self, scroll_visible: bool = False) -> Self:
         return self.input.focus(scroll_visible=scroll_visible)
 
-    def on_descendant_blur(self) -> None:
+    def on_descendant_blur(self, event: events.DescendantBlur) -> None:
+        if self.show_tree_picker:
+            if event.widget == self.tree_view:
+                self.post_message(Dismiss(self))
+        else:
+            if event.widget == self.input:
+                self.post_message(Dismiss(self))
+
+    @on(DirectoryTree.NodeHighlighted)
+    def on_node_highlighted(self, event: DirectoryTree.NodeHighlighted) -> None:
+        event.stop()
+
+        dir_entry = event.node.data
+        path = dir_entry.path
+
+        path = Path(path).relative_to(self.root)
+        self.tree_path = str(path)
+
+        self.post_message(PromptSuggestion(self.tree_path))
+
+    @on(DirectoryTree.FileSelected)
+    def on_file_selected(self, event: DirectoryTree.FileSelected) -> None:
+        event.stop()
+
+        dir_entry = event.node.data
+        path = dir_entry.path
+
+        path = Path(path).relative_to(self.root)
+        self.tree_path = str(path)
+
+        self.post_message(InsertPath(self.tree_path))
         self.post_message(Dismiss(self))
 
     @on(Input.Changed)
@@ -178,7 +270,10 @@ class PathSearch(containers.VerticalGroup):
         self.action_submit()
 
     def action_submit(self):
-        if (highlighted := self.option_list.highlighted) is not None:
+        if self.show_tree_picker:
+            raise SkipAction()
+
+        elif (highlighted := self.option_list.highlighted) is not None:
             option = self.option_list.options[highlighted]
             if option.id:
                 self.post_message(InsertPath(option.id))
