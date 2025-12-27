@@ -19,9 +19,9 @@ StoreScreen {
     }
 
     Footer {
-        background: black 10%;
+        
         .footer-key--key {
-            color: $accent;
+            # color: $accent;
             background: transparent;
             # text-style: not bold;
             padding: 0 1;        
