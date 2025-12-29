@@ -254,6 +254,7 @@ class PermissionsScreen(Screen[Answer]):
                     await self.populate_callback(self)
 
             asyncio.create_task(run_populate())
+        self.question.focus()
 
     async def add_diff(
         self, path1: str, path2: str, before: str | None, after: str
