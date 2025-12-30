@@ -57,6 +57,7 @@ class Shell:
         working_directory: str,
         shell="",
         start="",
+        hide_start: bool = True,
     ) -> None:
         self.conversation = conversation
         self.working_directory = working_directory
@@ -65,6 +66,8 @@ class Shell:
         self.new_log: bool = False
         self.shell = shell or os.environ.get("SHELL", "sh")
         self.shell_start = start
+        self.hide_start = hide_start
+        self.omit_prelude = True
         self.master: int | None = None
         self._task: asyncio.Task | None = None
         self._process: asyncio.subprocess.Process | None = None
@@ -75,9 +78,15 @@ class Shell:
         self._hide_echo: set[bytes] = set()
         """A set of byte strings to remove from output."""
 
+        self._hide_output = hide_start
+        """Hide all output."""
+
     @property
     def is_finished(self) -> bool:
         return self._finished
+
+    async def wait_for_ready(self) -> None:
+        await self._ready_event.wait()
 
     async def send(self, command: str, width: int, height: int) -> None:
         await self._ready_event.wait()
@@ -111,14 +120,19 @@ class Shell:
         with suppress(OSError):
             resize_pty(self.master, width, max(height, 1))
 
-    async def write(self, text: str | bytes, hide_echo: bool = False) -> int:
+    async def write(
+        self, text: str | bytes, hide_echo: bool = True, hide_output: bool = False
+    ) -> int:
         if self.master is None:
             return 0
         text_bytes = text.encode("utf-8", "ignore") if isinstance(text, str) else text
 
         if hide_echo:
-            self._hide_echo.add(text_bytes)
+            for line in text_bytes.split(b"\n"):
+                if line:
+                    self._hide_echo.add(line)
         result = await asyncio.to_thread(os.write, self.master, text_bytes)
+        self._hide_output = hide_output
         return result
 
     async def run(self) -> None:
@@ -178,7 +192,7 @@ class Shell:
             shell_start = self.shell_start.strip()
             if not shell_start.endswith("\n"):
                 shell_start += "\n"
-            await self.write(shell_start, hide_echo=True)
+            await self.write(shell_start, hide_echo=True, hide_output=self.hide_start)
 
         unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
 
@@ -186,13 +200,17 @@ class Shell:
             data = await shell_read(reader, BUFFER_SIZE)
 
             for string_bytes in list(self._hide_echo):
-                remove_bytes = string_bytes.replace(b"\n", b"\r\n")
+                remove_bytes = string_bytes
                 if remove_bytes in data:
-                    data = data.replace(remove_bytes, b"")
+                    remove_start = data.index(remove_bytes)
+                    try:
+                        next_line = data.index(b"\n", remove_start + len(remove_bytes))
+                    except ValueError:
+                        data = data.replace(remove_bytes, b"\x1b[2K")
+                    else:
+                        data = data[:remove_start] + b"\x1b[2K" + data[next_line + 1 :]
+
                     self._hide_echo.discard(string_bytes)
-                    if not data:
-                        data = b"\r"
-                        break
 
             if line := unicode_decoder.decode(data, final=not data):
                 if self.terminal is None or self.terminal.is_finalized:
@@ -204,7 +222,11 @@ class Shell:
                     #     self.terminal.set_state(previous_state)
                     self.terminal.set_write_to_stdin(self.write)
 
-                if await self.terminal.write(line) and not self.terminal.display:
+                if self._hide_output:
+                    terminal_updated = False
+                else:
+                    terminal_updated = await self.terminal.write(line)
+                if terminal_updated and not self.terminal.display:
                     if (
                         self.terminal.alternate_screen
                         or not self.terminal.state.scrollback_buffer.is_blank

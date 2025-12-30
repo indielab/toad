@@ -89,7 +89,6 @@ class Terminal(ScrollView, can_focus=True):
         self._finalized: bool = False
         self.current_directory: str | None = None
         self._alternate_screen: bool = False
-
         self._terminal_render_cache: LRUCache[tuple, Strip] = LRUCache(1024)
         self._write_to_stdin: Callable[[str], Awaitable] | None = None
 
@@ -106,7 +105,8 @@ class Terminal(ScrollView, can_focus=True):
     @property
     def height(self) -> int:
         """Height of the terminal."""
-        return self._height
+        height = self._height
+        return height
 
     @property
     def size(self) -> Size:
@@ -245,6 +245,7 @@ class Terminal(ScrollView, can_focus=True):
             self.finalize()
         width = self.state.width
         height = self.state.scrollback_buffer.height
+
         if self.state.alternate_screen:
             height += self.state.alternate_buffer.height
         self.virtual_size = Size(min(self.state.buffer.max_line_width, width), height)

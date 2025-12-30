@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from asyncio import Future
 import asyncio
+from contextlib import suppress
 from itertools import filterfalse
 from operator import attrgetter
 import platform
@@ -1074,7 +1075,6 @@ class Conversation(containers.Vertical):
         self.prompt.slash_commands = self._build_slash_commands()
         self.call_after_refresh(self.post_welcome)
         self.app.settings_changed_signal.subscribe(self, self._settings_changed)
-        # self.shell.start()
 
         self.shell_history.complete.add_words(
             self.app.settings.get("shell.allow_commands", expect_type=str).split()
@@ -1112,6 +1112,10 @@ class Conversation(containers.Vertical):
             self.agent_ready = False
 
     async def watch_agent_ready(self, ready: bool) -> None:
+        self.shell
+        with suppress(asyncio.TimeoutError):
+            async with asyncio.timeout(2.0):
+                await self.shell.wait_for_ready()
         if ready and (agent_data := self._agent_data) is not None:
             welcome = agent_data.get("welcome", None)
             from toad.widgets.markdown_note import MarkdownNote

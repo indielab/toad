@@ -797,7 +797,8 @@ class Buffer:
     @property
     def height(self) -> int:
         """Height of the buffer (number of folded lines)."""
-        return len(self.folded_lines)
+        height = len(self.folded_lines)
+        return height
 
     @property
     def last_line_no(self) -> int:
