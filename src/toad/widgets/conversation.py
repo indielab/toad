@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from asyncio import Future
 import asyncio
+from contextlib import suppress
 from itertools import filterfalse
 from operator import attrgetter
 import platform
@@ -278,6 +279,7 @@ class Conversation(containers.Vertical):
         self.prompt_history = History(self.project_data_path / "prompt_history.jsonl")
 
         self.session_start_time: float | None = None
+        self._terminal_count = 0
 
     @property
     def agent_title(self) -> str | None:
@@ -373,8 +375,10 @@ class Conversation(containers.Vertical):
         self._focusable_terminals[:] = list(
             filterfalse(attrgetter("is_finalized"), self._focusable_terminals)
         )
-        if self._focusable_terminals:
-            return self._focusable_terminals[-1]
+
+        for terminal in reversed(self._focusable_terminals):
+            if terminal.display:
+                return terminal
         return None
 
     def add_focusable_terminal(self, terminal: Terminal) -> None:
@@ -393,6 +397,7 @@ class Conversation(containers.Vertical):
             self._focusable_terminals.remove(event.terminal)
         except ValueError:
             pass
+        self.log(self._focusable_terminals)
         self.prompt.project_directory_updated()
 
     @on(Terminal.AlternateScreenChanged)
@@ -693,14 +698,7 @@ class Conversation(containers.Vertical):
     def on_current_working_directory_changed(
         self, event: CurrentWorkingDirectoryChanged
     ) -> None:
-        if self._terminal is not None:
-            self._terminal.finalize()
         self.working_directory = str(Path(event.path).resolve().absolute())
-
-    @on(ShellFinished)
-    def on_shell_finished(self) -> None:
-        if self._terminal is not None:
-            self._terminal.finalize()
 
     def watch_busy_count(self, busy: int) -> None:
         self.throbber.set_class(busy > 0, "-busy")
@@ -814,9 +812,10 @@ class Conversation(containers.Vertical):
         return terminal
 
     async def action_interrupt(self) -> None:
-        if self._terminal is not None:
+        terminal = self._terminal
+        if terminal is not None and not terminal.is_finalized:
             await self.shell.interrupt()
-            self._shell = None
+            # self._shell = None
             self.flash("Command interrupted", style="success")
         else:
             raise SkipAction()
@@ -1074,12 +1073,11 @@ class Conversation(containers.Vertical):
         self.prompt.slash_commands = self._build_slash_commands()
         self.call_after_refresh(self.post_welcome)
         self.app.settings_changed_signal.subscribe(self, self._settings_changed)
-        # self.shell.start()
 
         self.shell_history.complete.add_words(
             self.app.settings.get("shell.allow_commands", expect_type=str).split()
         )
-
+        self.shell
         if self._agent_data is not None:
 
             def start_agent() -> None:
@@ -1112,6 +1110,9 @@ class Conversation(containers.Vertical):
             self.agent_ready = False
 
     async def watch_agent_ready(self, ready: bool) -> None:
+        with suppress(asyncio.TimeoutError):
+            async with asyncio.timeout(2.0):
+                await self.shell.wait_for_ready()
         if ready and (agent_data := self._agent_data) is not None:
             welcome = agent_data.get("welcome", None)
             from toad.widgets.markdown_note import MarkdownNote
@@ -1181,16 +1182,20 @@ class Conversation(containers.Vertical):
         """
         from toad.widgets.shell_terminal import ShellTerminal
 
-        if self._terminal is not None:
-            if self._terminal.state.buffer.is_blank:
-                await self._terminal.remove()
-            self._terminal.finalize()
+        if (terminal := self._terminal) is not None:
+            if terminal.state.buffer.is_blank:
+                terminal.finalize()
+                await terminal.remove()
+
+        self._terminal_count += 1
 
         terminal_width, terminal_height = self.get_terminal_dimensions()
         terminal = ShellTerminal(
+            f"terminal #{self._terminal_count}",
             size=(terminal_width, terminal_height),
             get_terminal_dimensions=self.get_terminal_dimensions,
         )
+
         terminal.display = False
         terminal = await self.post(terminal)
         self.add_focusable_terminal(terminal)
