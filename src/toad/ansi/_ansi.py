@@ -889,7 +889,6 @@ class Buffer:
         self.updates = updates
 
     def remove_last_line(self) -> None:
-        print("REMOVE LINE")
         if not self.lines:
             return
         last_line_index = len(self.lines) - 1

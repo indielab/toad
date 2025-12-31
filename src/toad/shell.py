@@ -128,7 +128,7 @@ class Shell:
             resize_pty(self.master, width, max(height, 1))
 
     async def write(
-        self, text: str | bytes, hide_echo: bool = True, hide_output: bool = False
+        self, text: str | bytes, hide_echo: bool = False, hide_output: bool = False
     ) -> int:
         if self.master is None:
             return 0
@@ -202,7 +202,7 @@ class Shell:
             shell_start = self.shell_start.strip()
             if not shell_start.endswith("\n"):
                 shell_start += "\n"
-            await self.write(shell_start, hide_echo=True, hide_output=self.hide_start)
+            await self.write(shell_start, hide_echo=False, hide_output=self.hide_start)
 
         unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
 
