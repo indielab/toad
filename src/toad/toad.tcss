@@ -303,8 +303,7 @@ Conversation {
         margin: 1 1 1 0; 
         #prompt {
             margin: 0 1 0 0;
-            color: $text-primary;
-            
+            color: $text-primary;            
         }  
     }
     

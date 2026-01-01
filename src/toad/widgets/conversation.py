@@ -1089,6 +1089,7 @@ class Conversation(containers.Vertical):
 
         else:
             self.agent_ready = True
+        self.ask([Answer("foo", "foo")], "Hello")
 
     def _settings_changed(self, setting_item: tuple[str, str]) -> None:
         key, value = setting_item
@@ -1126,11 +1127,19 @@ class Conversation(containers.Vertical):
         ):
             return
         widget = event.widget
+
         contents = self.contents
         if self.screen.get_selected_text():
             return
         if widget is None or widget.is_maximized:
             return
+        try:
+            widget.query_ancestor(Prompt)
+        except NoMatches:
+            pass
+        else:
+            return
+
         if widget in contents.displayed_children:
             self.cursor_offset = contents.displayed_children.index(widget)
             self.refresh_block_cursor()
@@ -1324,10 +1333,18 @@ class Conversation(containers.Vertical):
             self.flash("Press [b]esc[/] again to cancel agent's turn")
             self._last_escape_time = monotonic()
 
-    def focus_prompt(self) -> None:
-        self.cursor_offset = -1
-        self.cursor.display = False
-        self.window.scroll_end()
+    def focus_prompt(self, reset_cursor: bool = True, scroll_end: bool = True) -> None:
+        """Focus the prompt input.
+
+        Args:
+            reset_cursor: Reset the block cursor.
+            scroll_end: Scroll t the end of the content.
+        """
+        if reset_cursor:
+            self.cursor_offset = -1
+            self.cursor.display = False
+        if scroll_end:
+            self.window.scroll_end()
         self.prompt.focus()
 
     async def action_select_block(self) -> None:
