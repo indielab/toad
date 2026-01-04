@@ -40,6 +40,7 @@ from toad.acp import protocol as acp_protocol
 from toad.acp.agent import Mode
 from toad.answer import Answer
 from toad.agent import AgentBase, AgentReady, AgentFail
+from toad.directory_watcher import DirectoryWatcher, DirectoryChanged
 from toad.history import History
 from toad.widgets.flash import Flash
 from toad.widgets.menu import Menu
@@ -321,6 +322,9 @@ class Conversation(containers.Vertical):
         self._turn_count = 0
         self._shell_count = 0
 
+        self._directory_changed = False
+        self._directory_watcher: DirectoryWatcher | None = None
+
     @property
     def agent_title(self) -> str | None:
         if self._agent_data is not None:
@@ -433,6 +437,12 @@ class Conversation(containers.Vertical):
         if not terminal.is_finalized:
             self._focusable_terminals.append(terminal)
 
+    @on(DirectoryChanged)
+    def on_directory_changed(self, event: DirectoryChanged) -> None:
+        event.stop()
+        self._directory_changed = True
+        self.notify("directory changed")
+
     @on(Terminal.Finalized)
     def on_terminal_finalized(self, event: Terminal.Finalized) -> None:
         """Terminal was finalized, so we can remove it from the list."""
@@ -441,6 +451,9 @@ class Conversation(containers.Vertical):
         except ValueError:
             pass
         self.prompt.project_directory_updated()
+        if self._directory_changed:
+            self._directory_changed = False
+            self.post_message(messages.ProjectDirectoryUpdated())
 
     @on(Terminal.AlternateScreenChanged)
     def on_terminal_alternate_screen_(
@@ -593,6 +606,8 @@ class Conversation(containers.Vertical):
     async def on_unmount(self) -> None:
         if self.agent is not None:
             await self.agent.stop()
+        if self._directory_watcher is not None:
+            self._directory_watcher.stop()
         if self._agent_data is not None and self.session_start_time is not None:
             session_time = monotonic() - self.session_start_time
             await self.app.capture_event(
@@ -712,8 +727,12 @@ class Conversation(containers.Vertical):
             await self._loading.remove()
         self._agent_response = None
         self._agent_thought = None
-        self.post_message(messages.ProjectDirectoryUpdated())
-        self.prompt.project_directory_updated()
+
+        if self._directory_changed:
+            self._directory_changed = False
+            self.post_message(messages.ProjectDirectoryUpdated())
+            self.prompt.project_directory_updated()
+
         self._turn_count += 1
 
         if stop_reason != "end_turn":
@@ -1185,6 +1204,9 @@ class Conversation(containers.Vertical):
         with suppress(asyncio.TimeoutError):
             async with asyncio.timeout(2.0):
                 await self.shell.wait_for_ready()
+        if ready:
+            self._directory_watcher = DirectoryWatcher(self.project_path, self)
+            self._directory_watcher.start()
         if ready and (agent_data := self._agent_data) is not None:
             welcome = agent_data.get("welcome", None)
             if welcome is not None:
