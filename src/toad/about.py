@@ -75,7 +75,7 @@ def render(app: ToadApp) -> str:
         "COLORTERM": os.environ.get("COLORTERM", ""),
         "CONFIG": config,
         "DATA_PATH": paths.get_data(),
-        "LOG_PATH": paths.get_state() / "logs",
+        "LOG_PATH": paths.get_log(),
         "PLATFORM": platform.platform(),
         "PYTHON": f"{platform.python_implementation()} {platform.python_version()}",
         "RICH_VERSION": version("rich"),

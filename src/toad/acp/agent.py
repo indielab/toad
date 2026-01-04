@@ -104,7 +104,7 @@ class Agent(AgentBase):
         if log_path := os.environ.get("TOAD_LOG"):
             self._log_file_path = Path(log_path).resolve().absolute()
         else:
-            self._log_file_path = paths.get_state() / "logs" / log_filename
+            self._log_file_path = paths.get_log() / log_filename
 
     @property
     def command(self) -> str | None:
