@@ -331,6 +331,13 @@ class Conversation(containers.Vertical):
             return self._agent_data["name"]
         return None
 
+    @property
+    def is_watching_directory(self) -> bool:
+        """Is the directory watcher enabled and watching?"""
+        if self._directory_watcher is None:
+            return False
+        return self._directory_watcher.enabled
+
     def validate_shell_history_index(self, index: int) -> int:
         return clamp(index, -self.shell_history.size, 0)
 
@@ -603,10 +610,11 @@ class Conversation(containers.Vertical):
         self.agent_ready = True
 
     async def on_unmount(self) -> None:
+        if self._directory_watcher is not None:
+            self._directory_watcher.stop()
         if self.agent is not None:
             await self.agent.stop()
-        if self._directory_watcher is not None:
-            await self._directory_watcher.stop()
+
         if self._agent_data is not None and self.session_start_time is not None:
             session_time = monotonic() - self.session_start_time
             await self.app.capture_event(
@@ -727,7 +735,7 @@ class Conversation(containers.Vertical):
         self._agent_response = None
         self._agent_thought = None
 
-        if self._directory_changed:
+        if self._directory_changed or not self.is_watching_directory:
             self._directory_changed = False
             self.post_message(messages.ProjectDirectoryUpdated())
             self.prompt.project_directory_updated()
