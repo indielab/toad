@@ -56,14 +56,14 @@ SCHEMA: list[SchemaDict] = [
             },
             {
                 "key": "status-line",
-                "title": "Show status line in the footer?",
+                "title": "Show status line in the info bar?",
                 "help": "The status line shows tokens and cost (not available in all agents).",
                 "type": "boolean",
                 "default": True,
             },
             {
                 "key": "agent-title",
-                "title": "Show agent title the footer?",
+                "title": "Show agent title the info bar?",
                 "help": "Disable for a little extras space.",
                 "type": "boolean",
                 "default": True,
