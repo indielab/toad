@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Restored prompt history
+- The `/about` slash command has been renamed to `/toad:about`, to crate a namespace for future Toad commands
 
 ## [0.5.21] - 2026-01-05
 
@@ -158,6 +159,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release. This document will be updated for subsequent releases.
 
+[0.5.22]: https://github.com/batrachianai/toad/compare/v0.5.21...v0.5.22
 [0.5.21]: https://github.com/batrachianai/toad/compare/v0.5.20...v0.5.21
 [0.5.20]: https://github.com/batrachianai/toad/compare/v0.5.19...v0.5.20
 [0.5.19]: https://github.com/batrachianai/toad/compare/v0.5.18...v0.5.19
