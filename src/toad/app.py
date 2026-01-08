@@ -16,6 +16,7 @@ from textual.reactive import var, reactive
 from textual.app import App
 from textual import events
 from textual.signal import Signal
+from textual.timer import Timer
 from textual.notifications import Notify
 
 import toad
@@ -245,6 +246,10 @@ class ToadApp(App, inherit_bindings=False):
     scrollbar: reactive[str] = reactive("normal")
     last_ctrl_c_time = reactive(0.0)
     update_required: reactive[bool] = reactive(False)
+    terminal_title: var[str] = var("Toad")
+    terminal_title_icon: var[str] = var("🐸")
+    terminal_title_flash = var(0)
+    terminal_title_blink = var(bool)
 
     HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (100, "-wide")]
 
@@ -270,6 +275,7 @@ class ToadApp(App, inherit_bindings=False):
         self._initial_mode = mode
         self.version_meta: VersionMeta | None = None
         self._supports_pyperclip: bool | None = None
+        self._terminal_title_flash_timer: Timer | None = None
 
         super().__init__()
 
@@ -334,6 +340,55 @@ class ToadApp(App, inherit_bindings=False):
             except Exception:
                 pass
         super().copy_to_clipboard(text)
+
+    def update_terminal_title(self) -> None:
+        screen_title = self.screen.title
+
+        title = (
+            f"{self.terminal_title} — {screen_title}"
+            if screen_title
+            else self.terminal_title
+        )
+        icon = self.terminal_title_icon
+        blink = self.terminal_title_blink
+
+        if self.terminal_title_flash:
+            if blink:
+                terminal_title = f"{icon} {title}"
+            else:
+                terminal_title = f"👉 {title}" if title else icon
+        else:
+            terminal_title = f"{icon} {title}"
+
+        if driver := self._driver:
+            driver.write(f"\033]0;{terminal_title}\007")
+
+    def watch_terminal_title_blink(self) -> None:
+        self.update_terminal_title()
+
+    def watch_terminal_title_flash(self, terminal_title_flash: int) -> None:
+
+        def toggle_blink():
+            self.terminal_title_blink = not self.terminal_title_blink
+
+        if terminal_title_flash:
+            if self._terminal_title_flash_timer is None:
+                self._terminal_title_flash_timer = self.set_interval(0.5, toggle_blink)
+        else:
+            if self._terminal_title_flash_timer is not None:
+                self._terminal_title_flash_timer.stop()
+                self.terminal_title_blink = False
+                self._terminal_title_flash_timer = None
+        self.update_terminal_title()
+
+    def watch_terminal_title(self, title: str) -> None:
+        self.update_terminal_title()
+
+    def terminal_alert(self, flash: bool = True) -> None:
+        if flash:
+            self.terminal_title_flash += 1
+        else:
+            self.terminal_title_flash -= 1
 
     @work(exit_on_error=False)
     async def capture_event(self, event_name: str, **properties: Any) -> None:
@@ -484,6 +539,7 @@ class ToadApp(App, inherit_bindings=False):
         else:
             self.push_screen(self.get_main_screen())
 
+        self.update_terminal_title()
         self.set_timer(1, self.run_version_check)
 
     @on(events.TextSelected)

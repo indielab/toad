@@ -286,6 +286,8 @@ class Conversation(containers.Vertical):
     status: var[str] = var("")
     column: var[bool] = var(False, toggle_class="-column")
 
+    title = var("")
+
     def __init__(self, project_path: Path, agent: AgentData | None = None) -> None:
         super().__init__()
 
@@ -318,6 +320,26 @@ class Conversation(containers.Vertical):
 
         self._directory_changed = False
         self._directory_watcher: DirectoryWatcher | None = None
+
+    def update_title(self):
+
+        def path_with_tilde(path: Path) -> str:
+            """Convert path to use ~ for home directory if applicable."""
+            path = Path(path).expanduser().resolve()
+            home = Path.home()
+
+            try:
+                relative = path.relative_to(home)
+                return f"~/{relative}"
+            except ValueError:
+                # Path is not relative to home
+                return str(path)
+
+        if agent_title := self.agent_title:
+            project_path = path_with_tilde(self.project_path)
+            self.screen.title = f"{agent_title} {project_path}"
+        else:
+            self.screen.title = ""
 
     @property
     def agent_title(self) -> str | None:
@@ -1046,7 +1068,11 @@ class Conversation(containers.Vertical):
                             await self.post(ToolCall(text))
 
             def answer_callback(answer: Answer) -> None:
-                result_future.set_result(answer)
+                try:
+                    result_future.set_result(answer)
+                except Exception:
+                    # I've seen this occur in shutdown with an `InvalidStateError`
+                    pass
 
             self.ask(options, title or "", answer_callback)
             return
@@ -1074,7 +1100,11 @@ class Conversation(containers.Vertical):
             title = tool_call_update.get("title", "") or ""
 
             def answer_callback(answer: Answer) -> None:
-                result_future.set_result(answer)
+                try:
+                    result_future.set_result(answer)
+                except Exception:
+                    # I've seen this occur in shutdown with an `InvalidStateError`
+                    pass
 
             self.ask(options, title, answer_callback)
 
@@ -1179,6 +1209,8 @@ class Conversation(containers.Vertical):
         else:
             self.agent_ready = True
 
+        self.update_title()
+
     def _settings_changed(self, setting_item: tuple[str, str]) -> None:
         key, value = setting_item
         if key == "shell.allow_commands":
@@ -1194,6 +1226,7 @@ class Conversation(containers.Vertical):
         else:
             self.agent_info = agent.get_info()
             self.agent_ready = False
+        self.update_title()
 
     async def watch_agent_ready(self, ready: bool) -> None:
         with suppress(asyncio.TimeoutError):

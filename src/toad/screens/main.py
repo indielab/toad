@@ -88,6 +88,9 @@ class MainScreen(Screen, can_focus=False):
         self.set_reactive(MainScreen.project_path, project_path)
         self._agent = agent
 
+    def watch_title(self, title: str) -> None:
+        self.app.update_terminal_title()
+
     def get_loading_widget(self) -> Widget:
         throbber = self.app.settings.get("ui.throbber", str)
         if throbber == "quotes":
