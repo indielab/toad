@@ -471,6 +471,7 @@ class Prompt(containers.VerticalGroup):
             ask: An `Ask` instance which contains a question and responses.
         """
         self.ask_queue.append(ask)
+        self.app.terminal_alert()
         if self._ask is None:
             self._ask = self.ask_queue.pop(0)
 
@@ -694,6 +695,7 @@ class Prompt(containers.VerticalGroup):
                 self._ask = self.ask_queue.pop(0)
             else:
                 self._ask = None
+            self.app.terminal_alert(False)
 
         if self._ask is not None and (callback := self._ask.callback) is not None:
             callback(event.answer)
