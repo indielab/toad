@@ -65,7 +65,6 @@ class ActionModal(ModalScreen):
     def on_mount(self) -> None:
         self.ok_button.loading = True
         self.command_pane.border_title = Content(self._title)
-
         self.run_command()
 
     @work()

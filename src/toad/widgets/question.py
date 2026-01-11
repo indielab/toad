@@ -237,7 +237,7 @@ class Question(Widget, can_focus=True):
     def compose(self) -> ComposeResult:
         with containers.VerticalGroup():
             if self.question:
-                yield Label(self.question, id="prompt")
+                yield Label(self.question, id="prompt", markup=False)
 
             with containers.VerticalGroup(id="option-container"):
                 kinds: set[str] = set()

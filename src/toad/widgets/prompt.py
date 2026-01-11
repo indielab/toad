@@ -725,7 +725,7 @@ class Prompt(containers.VerticalGroup):
         with PromptContainer(id="prompt-container"):
             yield Question()
             with containers.HorizontalGroup(id="text-prompt"):
-                yield Label(self.PROMPT_AI, id="prompt")
+                yield Label(self.PROMPT_AI, id="prompt", markup=False)
                 yield PromptTextArea().data_bind(
                     multi_line=Prompt.multi_line,
                     shell_mode=Prompt.shell_mode,

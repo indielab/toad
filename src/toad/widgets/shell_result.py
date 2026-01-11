@@ -25,7 +25,7 @@ class ShellResult(containers.HorizontalGroup):
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
 
     def compose(self) -> ComposeResult:
-        yield NonSelectableLabel("$", id="prompt")
+        yield NonSelectableLabel("$", id="prompt", markup=False)
         yield Static(highlight(self._command, language="sh"))
 
     def get_block_menu(self) -> Iterable[MenuItem]:
