@@ -7,7 +7,22 @@ from textual import widgets
 from textual.message import Message
 
 
+class SideBarCollapsible(widgets.Collapsible):
+    BINDING_GROUP_TITLE = "Sidebar collapsible"
+    HELP = """\
+## Sidebar
+
+This is your sidebar.
+
+The Sidebar contains additonal information associated with the conversation.
+
+- **tab / shift+tab** Navigate sections
+- **enter** expand or collapse secions
+"""
+
+
 class SideBar(containers.Vertical):
+    BINDING_GROUP_TITLE = "Sidebar"
     BINDINGS = [("escape", "dismiss", "Dismiss sidebar")]
 
     class Dismiss(Message):
@@ -39,7 +54,7 @@ class SideBar(containers.Vertical):
 
     def compose(self) -> ComposeResult:
         for panel in self.panels:
-            yield widgets.Collapsible(
+            yield SideBarCollapsible(
                 panel.widget,
                 title=panel.title,
                 collapsed=panel.collapsed,

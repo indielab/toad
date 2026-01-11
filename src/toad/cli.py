@@ -5,6 +5,20 @@ from toad.app import ToadApp
 from toad.agent_schema import Agent
 
 
+def set_process_title(title: str) -> None:
+    """Set the process title.
+
+    Args:
+        title: Desired title.
+    """
+    try:
+        import setproctitle
+
+        setproctitle.setproctitle(title)
+    except Exception:
+        pass
+
+
 def check_directory(path: str) -> None:
     """Check a path is directory, or exit the app.
 
@@ -116,6 +130,7 @@ def run(port: int, host: str, serve: bool, project_dir: str = ".", agent: str = 
             port=port,
             title=serve_command,
         )
+        set_process_title("toad --serve")
         server.serve()
     else:
         app.run()
@@ -198,7 +213,9 @@ def acp(
             port=port,
             title=serve_command,
         )
+        set_process_title("toad acp --serve")
         server.serve()
+
     else:
         app = ToadApp(agent_data=agent_data, project_dir=project_dir)
         app.run()
@@ -239,6 +256,7 @@ def serve(port: int, host: str) -> None:
     from textual_serve.server import Server
 
     server = Server(sys.argv[0], host=host, port=port, title="Toad")
+    set_process_title("toad serve")
     server.serve()
 
 

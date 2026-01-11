@@ -543,6 +543,16 @@ class ToadApp(App, inherit_bindings=False):
 
         self.update_terminal_title()
         self.set_timer(1, self.run_version_check)
+        self.set_process_title()
+
+    @work(thread=True, exit_on_error=False)
+    def set_process_title(self) -> None:
+        try:
+            import setproctitle
+
+            setproctitle.setproctitle("toad")
+        except Exception:
+            pass
 
     @on(events.TextSelected)
     async def on_text_selected(self) -> None:

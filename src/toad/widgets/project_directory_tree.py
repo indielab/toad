@@ -12,6 +12,7 @@ from toad.path_filter import PathFilter
 
 
 class ProjectDirectoryTree(DirectoryTree):
+    BINDING_GROUP_TITLE = "Tree view"
     HELP = """\
 ## Project files
 

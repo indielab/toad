@@ -35,7 +35,8 @@ from toad.path_complete import PathComplete
 
 
 class ModeSwitcher(OptionList):
-    BINDINGS = [Binding("escape", "dismiss")]
+    BINDING_GROUP_TITLE = "Mode switcher"
+    BINDINGS = [Binding("escape", "dismiss", "Dismiss mode switcher")]
 
     @on(OptionList.OptionSelected)
     def on_option_selected(self, event: OptionList.OptionSelected):
