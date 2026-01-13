@@ -474,6 +474,7 @@ Prompt {
             overflow: auto;
             max-height: 50vh;  
             margin-bottom: 1;
+            
             DiffView {
                 .diff-group {                    
                     margin-bottom: 0;
@@ -481,7 +482,10 @@ Prompt {
             }
             & > * {                
                 margin: 1 0 0 0;
-            }          
+            }
+            &:empty {
+                display: none;
+            }
         }
         #option-container {
             # margin-top: 1;
