@@ -343,9 +343,6 @@ class DiffView(containers.VerticalGroup):
                 code_b_spans: list[Span] = []
 
                 for tag, i1, i2, j1, j2 in sequence_matcher.get_opcodes():
-                    if (tag == "replace") and (i1, i2) == (j1, j2):
-                        print(repr(code_a[i1:i2].plain), repr(code_b[j1:j2].plain))
-                        continue
                     if tag in {"delete", "replace"}:
                         code_a_spans.append(Span(i1, i2, "on $error 40%"))
                     if tag in {"insert", "replace"}:

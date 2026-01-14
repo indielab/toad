@@ -178,7 +178,6 @@ Tap escape *twice* to exit.
             self.blur()
             self.post_message(self.Finalized(self))
 
-            # self.state.remove_trailing_blank_lines_from_scrollback()
             if not self.state.buffer.height:
                 self.remove()
 
