@@ -3,9 +3,10 @@ from __future__ import annotations
 from asyncio import Future
 import asyncio
 from contextlib import suppress
+from functools import partial
 from itertools import filterfalse
 from operator import attrgetter
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Iterable, Literal
 from pathlib import Path
 from time import monotonic
 
@@ -38,6 +39,7 @@ from toad import paths
 from toad.agent_schema import Agent as AgentData
 from toad.acp import messages as acp_messages
 from toad.app import ToadApp
+from toad.acp.protocol import ToolCallContent
 from toad.acp import protocol as acp_protocol
 from toad.acp.agent import Mode
 from toad.answer import Answer
@@ -55,6 +57,7 @@ from toad.shell import Shell, CurrentWorkingDirectoryChanged
 from toad.slash_command import SlashCommand
 from toad.protocol import BlockProtocol, MenuProtocol, ExpandProtocol
 from toad.menus import MenuItem
+from toad.widgets.shell_terminal import ShellTerminal
 
 if TYPE_CHECKING:
     from toad.widgets.terminal import Terminal
@@ -196,7 +199,7 @@ class Contents(containers.VerticalGroup, can_focus=False):
     ) -> list[WidgetPlacement]:
         if placements:
             last_placement = placements[-1]
-            top, right, bottom, left = last_placement.margin
+            top, right, _bottom, left = last_placement.margin
             placements[-1] = last_placement._replace(
                 margin=Spacing(top, right, 0, left)
             )
@@ -214,7 +217,11 @@ class ContentsGrid(containers.Grid):
 class CursorContainer(containers.Vertical):
     def render_lines(self, crop: Region) -> list[Strip]:
         rich_style = self.visual_style.rich_style
-        return [Strip([Segment("▌", rich_style)], cell_length=1)] * crop.height
+        strips = [Strip([Segment("▌", rich_style)], cell_length=1)] * crop.height
+        if crop.y == 0 and strips:
+            strips[0] = Strip([Segment(" ", rich_style)], cell_length=1)
+
+        return strips
 
 
 class Window(containers.VerticalScroll):
@@ -500,6 +507,13 @@ class Conversation(containers.Vertical):
         if not terminal.is_finalized:
             self._focusable_terminals.append(terminal)
 
+    @on(ShellTerminal.Interrupt)
+    async def on_shell_terminal_terminate(self, event: ShellTerminal.Terminate) -> None:
+        if not event.teminal.is_finalized:
+            await self.shell.interrupt()
+            self.cursor_offset = -1
+            self.flash("Command interrupted", style="success")
+
     @on(DirectoryChanged)
     def on_directory_changed(self, event: DirectoryChanged) -> None:
         event.stop()
@@ -517,6 +531,15 @@ class Conversation(containers.Vertical):
             self.prompt.project_directory_updated()
             self._directory_changed = False
             self.post_message(messages.ProjectDirectoryUpdated())
+
+    @on(Terminal.LongRunning)
+    def on_terminal_long_running(self, event: Terminal.LongRunning) -> None:
+        if (
+            not event.terminal.is_finalized
+            and not event.terminal.has_focus
+            and not event.terminal.state.buffer.is_blank
+        ):
+            self.flash("Press [b]ctrl+f[/b] to focus command", style="default")
 
     @on(Terminal.AlternateScreenChanged)
     def on_terminal_alternate_screen_(
@@ -700,7 +723,7 @@ class Conversation(containers.Vertical):
         if message.message:
             error = Content.assemble(
                 Content.from_markup(message.message).stylize("$text-error"),
-                " - ",
+                " — ",
                 Content.from_markup(message.details.strip()).stylize("dim"),
             )
         else:
@@ -975,6 +998,10 @@ class Conversation(containers.Vertical):
         else:
             raise SkipAction()
 
+    def action_focus_block(self, block_id: str) -> None:
+        with suppress(NoMatches):
+            self.query_one(f"#{block_id}").focus()
+
     @work
     @on(acp_messages.CreateTerminal)
     async def on_acp_create_terminal(self, message: acp_messages.CreateTerminal):
@@ -1108,59 +1135,60 @@ class Conversation(containers.Vertical):
         options: list[Answer],
         tool_call_update: acp_protocol.ToolCallUpdatePermissionRequest,
     ) -> None:
-        kind = tool_call_update.get("kind")
+        kind = tool_call_update.get("kind", None)
+        title = tool_call_update.get("title", "") or ""
 
-        title: str | None = None
-        if kind is None:
-            from toad.widgets.tool_call import ToolCall
-
-            if (contents := tool_call_update.get("content")) is not None:
-                title = tool_call_update.get("title")
-                for content in contents:
-                    match content:
-                        case {"type": "text", "content": {"text": text}}:
-                            await self.post(ToolCall(text))
-
-            def answer_callback(answer: Answer) -> None:
-                try:
-                    result_future.set_result(answer)
-                except Exception:
-                    # I've seen this occur in shutdown with an `InvalidStateError`
-                    pass
-
-            self.ask(options, title or "", answer_callback)
-            return
+        contents = tool_call_update.get("content", []) or []
+        # If all the content is diffs, we will set kind to "edit" to show the permisisons screen
+        for content in contents:
+            if content.get("type") != "diff":
+                break
+        else:
+            kind = "edit"
 
         if kind == "edit":
-            from toad.screens.permissions import PermissionsScreen
+            diffs: list[tuple[str, str, str | None, str]] = []
 
-            async def populate(screen: PermissionsScreen) -> None:
-                if (contents := tool_call_update.get("content")) is None:
-                    return
-                for content in contents:
-                    match content:
-                        case {
-                            "type": "diff",
-                            "oldText": old_text,
-                            "newText": new_text,
-                            "path": path,
-                        }:
-                            await screen.add_diff(path, path, old_text, new_text)
+            contents = tool_call_update.get("content", []) or []
+            for content in contents:
+                match content:
+                    case {
+                        "type": "diff",
+                        "oldText": old_text,
+                        "newText": new_text,
+                        "path": path,
+                    }:
+                        diffs.append((path, path, old_text, new_text))
 
-            permissions_screen = PermissionsScreen(options, populate_callback=populate)
-            result = await self.app.push_screen_wait(permissions_screen)
-            result_future.set_result(result)
-        else:
-            title = tool_call_update.get("title", "") or ""
+            if diffs:
+                from toad.screens.permissions import PermissionsScreen
 
-            def answer_callback(answer: Answer) -> None:
-                try:
-                    result_future.set_result(answer)
-                except Exception:
-                    # I've seen this occur in shutdown with an `InvalidStateError`
-                    pass
+                permissions_screen = PermissionsScreen(options, diffs)
+                result = await self.app.push_screen_wait(permissions_screen)
+                result_future.set_result(result)
+                return
 
-            self.ask(options, title, answer_callback)
+        from toad.widgets.acp_content import ACPToolCallContent
+
+        def answer_callback(answer: Answer) -> None:
+            try:
+                result_future.set_result(answer)
+            except Exception:
+                # I've seen this occur in shutdown with an `InvalidStateError`
+                pass
+
+        tool_call_content = tool_call_update.get("content", None) or []
+        self.ask(
+            options,
+            title or "",
+            (
+                partial(ACPToolCallContent, tool_call_content)
+                if tool_call_content
+                else None
+            ),
+            answer_callback,
+        )
+        return
 
     async def post_tool_call(
         self, tool_call_update: acp_protocol.ToolCallUpdate
@@ -1197,7 +1225,8 @@ class Conversation(containers.Vertical):
     def ask(
         self,
         options: list[Answer],
-        question: str = "",
+        title: str = "",
+        get_content: Callable[[], Widget] | None = None,
         callback: Callable[[Answer], Any] | None = None,
     ) -> None:
         """Replace the prompt with a dialog to ask a question
@@ -1212,13 +1241,13 @@ class Conversation(containers.Vertical):
         self.agent_info
 
         if self.agent_title:
-            notify_title = f"[{self.agent_title}] {question}"
+            notify_title = f"[{self.agent_title}] {title}"
         else:
-            notify_title = question
+            notify_title = title
         notify_message = "\n".join(f" • {option.text}" for option in options)
         self.app.system_notify(notify_message, title=notify_title, sound="question")
 
-        self.prompt.ask(Ask(question, options, callback))
+        self.prompt.ask(Ask(title, options, get_content, callback))
 
     def _build_slash_commands(self) -> list[SlashCommand]:
         slash_commands = [
@@ -1345,13 +1374,20 @@ class Conversation(containers.Vertical):
     async def post[WidgetType: Widget](
         self, widget: WidgetType, *, anchor: bool = True, loading: bool = False
     ) -> WidgetType:
+        """Post a widget to the converstaion.
+
+        Args:
+            widget: Widget to post.
+            anchor: Anchor to bottom of view?
+            loading: Set the widget to an initial loading state?
+
+        Returns:
+            The widget that was mounted.
+        """
         if self._loading is not None:
             await self._loading.remove()
         if not self.contents.is_attached:
             return widget
-
-        if not any(child.display for child in self.contents.children):
-            widget.add_class("-first")
         await self.contents.mount(widget)
 
         widget.loading = loading
@@ -1364,10 +1400,10 @@ class Conversation(containers.Vertical):
     async def check_prune(self) -> None:
         """Check if a prune is required."""
         if self._require_check_prune:
+            self._require_check_prune = False
             low_mark = self.app.settings.get("ui.prune_low_mark", int)
             high_mark = low_mark + self.app.settings.get("ui.prune_excess", int)
             await self.prune_window(low_mark, high_mark)
-            self._require_check_prune = False
 
     async def prune_window(self, low_mark: int, high_mark: int) -> None:
         """Remove older children to keep within a certain range.
@@ -1416,7 +1452,6 @@ class Conversation(containers.Vertical):
         Returns:
             A new (mounted) Terminal widget.
         """
-        from toad.widgets.shell_terminal import ShellTerminal
 
         if (terminal := self._terminal) is not None:
             if terminal.state.buffer.is_blank:
@@ -1428,6 +1463,7 @@ class Conversation(containers.Vertical):
         terminal_width, terminal_height = self.get_terminal_dimensions()
         terminal = ShellTerminal(
             f"terminal #{self._terminal_count}",
+            id=f"shell-terminal-{self._terminal_count}",
             size=(terminal_width, terminal_height),
             get_terminal_dimensions=self.get_terminal_dimensions,
         )
@@ -1448,7 +1484,7 @@ class Conversation(containers.Vertical):
             16,
             (self.window.size.width - 2 - self.window.styles.scrollbar_size_vertical),
         )
-        terminal_height = max(8, self.window.scrollable_content_region.height - 4)
+        terminal_height = max(8, self.window.scrollable_content_region.height)
         return terminal_width, terminal_height
 
     @property

@@ -317,6 +317,7 @@ class DiffView(containers.VerticalGroup):
         Returns:
             A pair of line lists for `code_before` and `code_after`
         """
+
         if self._highlighted_code_lines is None:
             language1 = highlight.guess_language(self.code_before, self.path1)
             language2 = highlight.guess_language(self.code_after, self.path2)
@@ -330,23 +331,25 @@ class DiffView(containers.VerticalGroup):
                 "\n".join(text_lines_b), language=language2, path=self.path2
             )
 
-            sequence_matcher = difflib.SequenceMatcher(
-                lambda character: character in " \t",
-                self.code_before,
-                self.code_after,
-                autojunk=True,
-            )
-            code_a_spans: list[Span] = []
-            code_b_spans: list[Span] = []
-            for tag, i1, i2, j1, j2 in sequence_matcher.get_opcodes():
-                if tag == "delete" and "\n" not in code_a.plain[i1 : i2 + 1]:
-                    code_a_spans.append(Span(i1, i2, "on $error 40%"))
+            if self.code_before:
 
-                if tag == "insert" and "\n" not in code_b.plain[j1 : j2 + 1]:
-                    code_b_spans.append(Span(j1, j2, "on $success 40%"))
+                sequence_matcher = difflib.SequenceMatcher(
+                    lambda character: character in " \t",
+                    code_a.plain,
+                    code_b.plain,
+                    autojunk=True,
+                )
+                code_a_spans: list[Span] = []
+                code_b_spans: list[Span] = []
 
-            code_a = code_a.add_spans(code_a_spans)
-            code_b = code_b.add_spans(code_b_spans)
+                for tag, i1, i2, j1, j2 in sequence_matcher.get_opcodes():
+                    if tag in {"delete", "replace"}:
+                        code_a_spans.append(Span(i1, i2, "on $error 40%"))
+                    if tag in {"insert", "replace"}:
+                        code_b_spans.append(Span(j1, j2, "on $success 40%"))
+
+                code_a = code_a.add_spans(code_a_spans)
+                code_b = code_b.add_spans(code_b_spans)
 
             lines_a = code_a.split("\n")
             lines_b = code_b.split("\n")
@@ -416,13 +419,13 @@ class DiffView(containers.VerticalGroup):
                         line_numbers_b.append(j1 + line_offset)
                         code_lines.append(line)
                     continue
-                if tag in {"replace", "delete"}:
+                if tag in {"delete", "replace"}:
                     for line_offset, line in enumerate(lines_a[i1:i2], 1):
                         annotations.append("-")
                         line_numbers_a.append(i1 + line_offset)
                         line_numbers_b.append(None)
                         code_lines.append(line)
-                if tag in {"replace", "insert"}:
+                if tag in {"insert", "replace"}:
                     for line_offset, line in enumerate(lines_b[j1:j2], 1):
                         annotations.append("+")
                         line_numbers_a.append(None)
@@ -520,12 +523,12 @@ class DiffView(containers.VerticalGroup):
                         code_lines_a.append(line)
                         code_lines_b.append(line)
                 else:
-                    if tag in {"replace", "delete"}:
+                    if tag in {"delete", "replace"}:
                         for line_number, line in enumerate(lines_a[i1:i2], i1 + 1):
                             annotations_a.append("-")
                             line_numbers_a.append(line_number)
                             code_lines_a.append(line)
-                    if tag in {"replace", "insert"}:
+                    if tag in {"insert", "replace"}:
                         for line_number, line in enumerate(lines_b[j1:j2], j1 + 1):
                             annotations_b.append("+")
                             line_numbers_b.append(line_number)

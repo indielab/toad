@@ -2,17 +2,15 @@
     margin: 1 1 1 0;  
 }
 
-.-first {
-    margin-top: 0 !important;
-}
 
 Markdown {
-    layout: stream;
+    layout: stream;    
 }
 
 LoadingIndicator {
     background: transparent;
 }
+
 
 
 
@@ -93,7 +91,7 @@ Checkbox {
 }
 
 
-MarkdownNote {
+Note,MarkdownNote {
     padding: 0 1 0 0;
     &.about MarkdownTable {
         # Make the tables compact in /about
@@ -402,6 +400,17 @@ Welcome {
 }
 
 
+ACPToolCallContent {
+    Markdown {
+        margin: 0;
+        padding-left: 0;
+        MarkdownBlock:last-of-type {
+            margin-bottom: 0;
+        }
+    }
+}
+
+
 Prompt {            
     padding: 0 0 0 0;    
     height: auto;  
@@ -462,8 +471,39 @@ Prompt {
 
     Question {
         display: none;
-        #prompt {
+        #title {
             width: 1fr;            
+        }
+        height: auto;        
+        
+        #title {
+            margin: 0;
+        }
+
+        #contents {
+            margin-top: 0;
+            height: auto;            
+            overflow: auto;
+            max-height: 50vh;  
+            margin-bottom: 1;
+            
+            DiffView {
+                .diff-group {                    
+                    margin-bottom: 0;
+                }
+            }
+            & > * {                
+                # height: 0;
+                margin: 1 0 0 0;
+            } 
+                     
+            &:empty {
+                height: 1;                
+            }
+        }
+        #option-container {
+            # margin-top: 1;
+            dock: bottom;
         }
     }
     &.-mode-ask {

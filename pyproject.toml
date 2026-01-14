@@ -1,6 +1,6 @@
 [project]
 name = "batrachian-toad"
-version = "0.5.29"
+version = "0.5.30"
 description = "A unified experience for AI in your terminal."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -49,6 +49,7 @@ packages = ["src/toad"]
 
 [dependency-groups]
 dev = [
+    "mypy>=1.19.1",
     "pyinstrument>=5.1.1",
     "textual-dev>=1.8.0",
 ]

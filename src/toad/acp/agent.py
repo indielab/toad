@@ -1,5 +1,6 @@
 import asyncio
 
+from contextlib import suppress
 from datetime import datetime
 import json
 import os
@@ -103,6 +104,8 @@ class Agent(AgentBase):
         log_filename: str = generate_datetime_filename(f"{agent['name']}", ".txt")
         if log_path := os.environ.get("TOAD_LOG"):
             self._log_file_path = Path(log_path).resolve().absolute()
+            with suppress(OSError):
+                self._log_file_path.unlink(missing_ok=True)
         else:
             self._log_file_path = paths.get_log() / log_filename
 
@@ -142,7 +145,7 @@ class Agent(AgentBase):
             """Write log in a thread."""
             try:
                 with log_file_path.open("at") as log_file:
-                    log_file.write(line)
+                    log_file.write(f"{line.rstrip()}\n")
             except OSError:
                 pass
 
@@ -294,13 +297,16 @@ class Agent(AgentBase):
         """
         result_future: asyncio.Future[Answer] = asyncio.Future()
         tool_call_id = toolCall["toolCallId"]
-        if tool_call_id not in self.tool_calls:
-            permission_tool_call = toolCall.copy()
-            permission_tool_call.pop("sessionUpdate", None)
-            tool_call = cast(protocol.ToolCall, permission_tool_call)
-            self.tool_calls[tool_call_id] = deepcopy(tool_call)
+
+        permission_tool_call = toolCall.copy()
+        permission_tool_call.pop("sessionUpdate", None)
+        tool_call = cast(protocol.ToolCall, permission_tool_call)
+        if tool_call_id in self.tool_calls:
+            self.tool_calls[tool_call_id] |= tool_call
         else:
-            tool_call = deepcopy(self.tool_calls[tool_call_id])
+            self.tool_calls[tool_call_id] = deepcopy(tool_call)
+
+        tool_call = deepcopy(self.tool_calls[tool_call_id])
 
         message = messages.RequestPermission(options, tool_call, result_future)
         self.post_message(message)
@@ -553,8 +559,12 @@ class Agent(AgentBase):
                 await self.acp_new_session()
             except jsonrpc.APIError as error:
                 if isinstance(error.data, dict):
-                    reason = str(error.data.get("reason") or "")
-                    details = str(error.data.get("details") or "")
+                    reason = str(
+                        error.data.get("reason") or "Failed to initialize agent"
+                    )
+                    details = str(
+                        error.data.get("details") or error.data.get("error") or ""
+                    )
                 else:
                     reason = "Failed to initialize agent"
                     details = ""
