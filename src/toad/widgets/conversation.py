@@ -176,6 +176,8 @@ class Cursor(Static):
                 + self.follow_widget.parent.virtual_region.y
             )
             self.offset = Offset(0, follow_y)
+        else:
+            self.styles.height = None
 
     def follow(self, widget: Widget | None) -> None:
         self.follow_widget = widget
@@ -184,6 +186,7 @@ class Cursor(Static):
             self.visible = False
             self.blink_timer.reset()
             self.blink_timer.pause()
+            self.styles.height = None
         else:
             self.visible = True
             self.blink_timer.reset()
@@ -1257,7 +1260,13 @@ class Conversation(containers.Vertical):
     def _build_slash_commands(self) -> list[SlashCommand]:
         slash_commands = [
             SlashCommand("/toad:about", "About Toad"),
+            SlashCommand(
+                "/toad:clear",
+                "Clear conversation window",
+                "<optional number of lines to preserve>",
+            ),
         ]
+
         slash_commands.extend(self.agent_slash_commands)
         deduplicated_slash_commands = {
             slash_command.command: slash_command for slash_command in slash_commands
@@ -1421,31 +1430,42 @@ class Conversation(containers.Vertical):
         assert high_mark >= low_mark
 
         contents = self.contents
+
         height = contents.virtual_size.height
         if height <= high_mark:
             return
         prune_children: list[Widget] = []
         bottom_margin = 0
         prune_height = 0
-        for child in contents.children:
-            if not child.display:
-                continue
-            top, _, bottom, _ = child.styles.margin
-            child_height = child.outer_size.height
-            prune_height = (
-                (prune_height - bottom_margin + max(bottom_margin, top))
-                + bottom
-                + child_height
-            )
-            bottom_margin = bottom
-            if height - prune_height <= low_mark:
-                break
-            prune_children.append(child)
+
+        if low_mark == 0:
+            prune_children = list(contents.children)
+        else:
+            for child in contents.children:
+                if not child.display:
+                    prune_children.append(child)
+                    continue
+                top, _, bottom, _ = child.styles.margin
+                child_height = child.outer_size.height
+                prune_height = (
+                    (prune_height - bottom_margin + max(bottom_margin, top))
+                    + bottom
+                    + child_height
+                )
+                bottom_margin = bottom
+                if height - prune_height <= low_mark:
+                    break
+                prune_children.append(child)
+
+        self.cursor_offset = -1
+        self.cursor.visible = False
+        self.cursor.follow(None)
+        contents.refresh(layout=True)
 
         if prune_children:
             await contents.remove_children(prune_children)
-            self.screen.refresh(layout=True)
-            self.call_after_refresh(self.window.anchor)
+
+        self.call_later(self.window.anchor)
 
     async def new_terminal(self) -> Terminal:
         """Create a new interactive Terminal.
@@ -1746,8 +1766,21 @@ class Conversation(containers.Vertical):
             await self.post(MarkdownNote(about_md, classes="about"))
             self.app.copy_to_clipboard(about_md)
             self.notify(
-                "A copy of /about-toad has been placed in your clipboard",
-                title="About",
+                "A copy of /about:toad has been placed in your clipboard",
+                title="/toad:about",
             )
             return True
+        elif command == "toad:clear":
+            try:
+                line_count = max(0, int(parameters) if parameters.strip() else 0)
+            except ValueError:
+                self.notify(
+                    "Unable to clear—a number was expected",
+                    title="/toad:clear",
+                    severity="error",
+                )
+                return True
+            await self.prune_window(line_count, line_count)
+            return True
+
         return False
