@@ -369,7 +369,7 @@ class DiffView(containers.VerticalGroup):
             if self.code_before:
                 for group in self.grouped_opcodes:
                     for tag, i1, i2, j1, j2 in group:
-                        if tag == "replace":
+                        if tag == "replace" and (j2 - j1) / (i2 - i1) <= 1.5:
                             diff_lines_a, diff_lines_b = self._highlight_diff_lines(
                                 lines_a[i1:i2], lines_b[j1:j2]
                             )
