@@ -172,6 +172,13 @@ See on-screen instructions for details.
                     content = content.stylize(
                         "$text-success", 0, len(slash_command.command)
                     )
+                    if (
+                        slash_command.hint
+                        and len(text) - (len(slash_command.command) + 1) == 0
+                    ):
+                        content += Content.styled(
+                            slash_command.hint, "$text-secondary 70%"
+                        )
                     break
             return content
         return Content(text)
@@ -625,7 +632,8 @@ class Prompt(containers.VerticalGroup):
         self.prompt_text_area.suggestion = ""
 
     def watch_show_slash_complete(self, show: bool) -> None:
-        self.slash_complete.focus()
+        if show:
+            self.slash_complete.focus()
 
     def project_directory_updated(self) -> None:
         """Called when there is may be new files"""
@@ -672,15 +680,17 @@ class Prompt(containers.VerticalGroup):
     def on_slash_complete_completed(self, event: SlashComplete.Completed) -> None:
         self.prompt_text_area.clear()
         self.prompt_text_area.insert(f"{event.command} ")
+        self.prompt_text_area.suggestion = ""
+        self.focus()
 
     @on(messages.Dismiss)
     def on_dismiss(self, event: messages.Dismiss) -> None:
         event.stop()
-        if event.widget is self.slash_complete:
+        if event.widget is self.slash_complete and self.show_slash_complete:
             self.show_slash_complete = False
             self.prompt_text_area.suggestion = ""
             self.focus()
-        elif event.widget is self.path_search:
+        if event.widget is self.path_search and self.show_path_search:
             self.show_path_search = False
             self.focus()
 

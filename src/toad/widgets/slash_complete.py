@@ -81,6 +81,12 @@ class SlashComplete(containers.VerticalGroup):
     ) -> None:
         super().__init__(id=id, classes=classes)
         self.slash_commands = list(slash_commands) if slash_commands else []
+        self.hints = {
+            slash_command.command: slash_command.hint
+            for slash_command in self.slash_commands
+            if slash_command.hint
+        }
+
         self.fuzzy_search = FuzzySearch(case_sensitive=False)
 
     def compose(self) -> ComposeResult:
@@ -103,7 +109,12 @@ class SlashComplete(containers.VerticalGroup):
         event.stop()
         self.filter_slash_commands(event.value)
 
-    async def watch_slash_commands(self) -> None:
+    async def watch_slash_commands(self, slash_commands: list[SlashCommand]) -> None:
+        self.hints = {
+            slash_command.command: slash_command.hint
+            for slash_command in slash_commands
+            if slash_command.hint
+        }
         self.filter_slash_commands(self.input.value)
 
     def filter_slash_commands(self, prompt: str) -> None:
@@ -200,10 +211,10 @@ class SlashComplete(containers.VerticalGroup):
         self.post_message(Dismiss(self))
 
     def action_submit(self) -> None:
-        if (option := self.option_list.highlighted_option) is not None:
+        option_list = self.option_list
+        if (option := option_list.highlighted_option) is not None:
             with self.input.prevent(widgets.Input.Changed):
                 self.input.clear()
-            self.post_message(Dismiss(self))
             self.post_message(self.Completed(option.id or ""))
 
 
