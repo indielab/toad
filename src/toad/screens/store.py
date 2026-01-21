@@ -129,7 +129,7 @@ Your favorite agents.
 
 class Launcher(containers.VerticalGroup):
     app = getters.app(ToadApp)
-    grid_select = getters.query_one("#launcher-grid-select", GridSelect)
+    grid_select = getters.query_one("#launcher-grid-select", LauncherGridSelect)
     DIGITS = "123456789ABCDEF"
 
     def __init__(
@@ -181,6 +181,9 @@ class Launcher(containers.VerticalGroup):
 
         if not launcher_agents:
             yield widgets.Label("Choose your fighter below!", classes="no-agents")
+
+    def launch_highlighted(self) -> None:
+        self.grid_select.action_launch()
 
 
 class LauncherItem(containers.VerticalGroup):
@@ -486,6 +489,7 @@ class StoreScreen(Screen):
                 return
             self.launcher.focus()
             self.launcher.highlighted = launch_item_offset
+            self.launcher.launch_highlighted()
 
     def action_quick_launch(self) -> None:
         self.launcher.focus()
