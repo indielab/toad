@@ -21,6 +21,7 @@ from textual.timer import Timer
 from textual.notifications import Notify
 
 import toad
+from toad.db import DB
 from toad.settings import Schema, Settings
 from toad.agent_schema import Agent as AgentData
 from toad.settings_schema import SCHEMA
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
     from toad.screens.main import MainScreen
     from toad.screens.settings import SettingsScreen
     from toad.screens.store import StoreScreen
+    from toad.db import DB
 
 
 DRACULA_TERMINAL_THEME = terminal_theme.TerminalTheme(
@@ -288,6 +290,15 @@ class ToadApp(App, inherit_bindings=False):
     @property
     def settings_path(self) -> Path:
         return paths.get_config() / "toad.json"
+
+    @property
+    def db_path(self) -> Path:
+        return paths.get_state() / "toad.db"
+
+    async def get_db(self) -> DB:
+        """Get an instance of the database."""
+        db = DB()
+        return db
 
     @cached_property
     def settings_schema(self) -> Schema:
@@ -555,6 +566,8 @@ class ToadApp(App, inherit_bindings=False):
         self.settings_changed_signal.publish((key, value))
 
     async def on_load(self) -> None:
+        db = await self.get_db()
+        await db.create()
         settings_path = self.settings_path
         if settings_path.exists():
             settings = json.loads(settings_path.read_text("utf-8"))
