@@ -89,6 +89,7 @@ StoreScreen {
         &:hover {
             background: $panel;
         }
+        pointer: pointer;
 
         Grid {
             grid-size: 2 1;
@@ -123,14 +124,13 @@ StoreScreen {
     }
 
     LauncherItem {
-        # width: 40;
-        # max-width: 40;        
         height: auto;               
         border: tall transparent;
         padding: 0 1;
         &:hover {
             background: $panel;
         }
+        pointer: pointer;
         Digits {
             width: auto;
             padding: 0 1 0 0;

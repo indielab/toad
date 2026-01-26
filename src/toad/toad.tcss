@@ -611,6 +611,7 @@ Prompt {
 
 ModeInfo:hover {
     text-style: underline;
+    pointer: pointer;
 }
 
 ModeSwitcher {
