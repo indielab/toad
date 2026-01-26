@@ -152,9 +152,10 @@ Some planned features:
 ### Reporting bugs
 
 This project is trialling a non-traditional approach to issues.
-Before an issue is created, there must be a post in Dicussions, approved by a Toad dev (Currently @willmcgugan).
+Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
