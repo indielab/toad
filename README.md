@@ -26,7 +26,7 @@ A unified interface for AI in your terminal ([release announcement](https://will
 
 Toad is an interface to coding agents, such as Claude, Gemini, Codex, OpenHand, and many more. 
 
-Toad blends a traditional shell based workflow and powerful agentic AI, with an intuitive and attractive Terminal User Interface.
+Toad blends a traditional shell based workflow and powerful agentic AI, with an intuitive Terminal User Interface.
 
 <table>
   <tbody>
@@ -244,6 +244,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
