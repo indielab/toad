@@ -100,7 +100,7 @@ Toad blends a traditional shell based workflow and powerful agentic AI, with an 
     </tr>
     <tr>
       <td>
-        <h3>Elegant markdown</h3>
+        <h3>Elegant Markdown</h3>
         <p>
         Markdown is the language of LLMs (AI).
         Toad's streaming Markdown support can display syntax highlighted code fences, elegant tables, quotes, lists, and more.
@@ -255,6 +255,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
