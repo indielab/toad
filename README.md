@@ -180,7 +180,7 @@ If you already have an agent installed, you can skip the install step.
 To launch an agent, select it and press space.
 
 The footer will always display the most significant keys for the current context.
-To see all the keys, summon the command palette with `ctrl+p` and search for "keys".
+To see all the keys, press <kbd>F1</kbd> to display the help panel.
 
 ### Toad CLI
 
@@ -244,6 +244,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
