@@ -2,8 +2,6 @@
 
 A unified interface for AI in your terminal ([release announcement](https://willmcgugan.github.io/toad-released/)).
 
-Run coding agents seamlessly under a single beautiful terminal UI, thanks to the [ACP](https://agentclientprotocol.com/protocol/initialization) protocol.
-
 <table>
 
   <tbody>
@@ -224,6 +222,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
