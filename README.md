@@ -188,7 +188,7 @@ You should see something like this:
 
 From this screen you will be able to find, install, and launch a coding agent.
 If you already have an agent installed, you can skip the install step.
-To launch an agent, select it and press space.
+To launch an agent, select it and press <kbd>space</kbd>.
 
 The footer will always display the most significant keys for the current context.
 To see all the keys, press <kbd>F1</kbd> to display the help panel.
@@ -255,6 +255,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Discussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
