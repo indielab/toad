@@ -27,6 +27,7 @@ COLORS = [
     "#0099cc",
     "#3366bb",
     "#663399",
+    "#881177",
 ]
 
 
@@ -47,11 +48,11 @@ class ThrobberVisual(Visual):
             Segment(
                 "━",
                 RichStyle.from_color(
-                    gradient.get_rich_color((offset / width)),
+                    gradient.get_rich_color((offset / width) % 1),
                     background,
                 ),
             )
-            for offset in range(width)
+            for offset in range(width * 2)
         ]
 
         return segments
@@ -73,8 +74,8 @@ class ThrobberVisual(Visual):
 
         time = monotonic()
         segments = self.make_segments(style, width)
-        offset = int(1 - (time % 1.0) * width)
-        segments = segments[offset:] + segments[:offset]
+        offset = width - int((time % 1.0) * width)
+        segments = segments[offset : offset + width]
         return [Strip(segments, cell_length=width)]
 
     def get_optimal_width(self, rules: RulesMap, container_width: int) -> int:
