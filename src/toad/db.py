@@ -171,8 +171,7 @@ class DB:
                     (max_results,),
                 )
                 rows = await cursor.fetchall()
-        except aiosqlite.Error as error:
-            print(error)
+        except aiosqlite.Error:
             return None
         sessions = [cast(Session, dict(row)) for row in rows]
         return sessions

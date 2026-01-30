@@ -108,9 +108,7 @@ class SessionResumeModal(ModalScreen[Session]):
         sessions = await db.session_get_recent()
         if sessions is None:
             return
-        self.log(sessions)
         for session in sessions:
-
             table.add_row(
                 session["agent"],
                 session["title"],
