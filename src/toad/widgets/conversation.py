@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from asyncio import Future
 import asyncio
+from dataclasses import dataclass
 from contextlib import suppress
 from functools import partial
 from itertools import filterfalse
 from operator import attrgetter
-from typing import TYPE_CHECKING, Iterable, Literal
+from typing import TYPE_CHECKING, Literal
 from pathlib import Path
 from time import monotonic
 
@@ -24,6 +25,7 @@ from textual.binding import Binding
 from textual.content import Content
 from textual.geometry import clamp
 from textual.css.query import NoMatches
+from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static
 from textual.widgets.markdown import MarkdownBlock, MarkdownFence
@@ -39,7 +41,6 @@ from toad import paths
 from toad.agent_schema import Agent as AgentData
 from toad.acp import messages as acp_messages
 from toad.app import ToadApp
-from toad.acp.protocol import ToolCallContent
 from toad.acp import protocol as acp_protocol
 from toad.acp.agent import Mode
 from toad.answer import Answer
@@ -66,7 +67,8 @@ if TYPE_CHECKING:
     from toad.widgets.terminal_tool import TerminalTool
 
 
-AGENT_FAIL_HELP = """\
+AGENT_FAIL_HELP = {
+    "fail": """\
 ## Agent failed to run
 
 **The agent failed to start.**
@@ -85,8 +87,21 @@ Some agents may require you to restart your shell (open a new terminal) after in
 
 If that fails, ask for help in [Discussions](https://github.com/batrachianai/toad/discussions)!
 
-https://github.com/batrachianai/toad/discussions
-"""
+https://github.com/batrachianai/toad/discussions""",
+    "no_resume": """\
+## Agent does not support resume
+
+The agent or ACP adapter does not support resuming sessions.
+
+Try updating to see if support has been added.
+
+- Exit the app, and run `toad` again
+- Select the agent and hit ENTER
+- Click the dropdown, select "Update" or "Install" again
+- Repeat the process to update the ACP adapter (if required)
+
+If that fails, ask for help in [Discussions](https://github.com/batrachianai/toad/discussions)!""",
+}
 
 HELP_URL = "https://github.com/batrachianai/toad/discussions"
 
@@ -339,7 +354,17 @@ class Conversation(containers.Vertical):
 
     title = var("")
 
-    def __init__(self, project_path: Path, agent: AgentData | None = None) -> None:
+    @dataclass
+    class SessionUpdate(Message):
+        name: str | None
+        """Name of the session, or `None` for no change."""
+
+    def __init__(
+        self,
+        project_path: Path,
+        agent: AgentData | None = None,
+        agent_session_id: str | None = None,
+    ) -> None:
         super().__init__()
 
         project_path = project_path.resolve().absolute()
@@ -353,6 +378,7 @@ class Conversation(containers.Vertical):
         self._agent_thought: AgentThought | None = None
         self._last_escape_time: float = monotonic()
         self._agent_data = agent
+        self._agent_session_id = agent_session_id
         self._agent_fail = False
         self._mouse_down_offset: Offset | None = None
 
@@ -735,7 +761,12 @@ class Conversation(containers.Vertical):
 
         from toad.widgets.markdown_note import MarkdownNote
 
-        await self.post(MarkdownNote(AGENT_FAIL_HELP))
+        if message.help in AGENT_FAIL_HELP:
+            help = AGENT_FAIL_HELP[message.help]
+        else:
+            help = AGENT_FAIL_HELP["fail"]
+
+        await self.post(MarkdownNote(help))
 
     @on(messages.WorkStarted)
     def on_work_started(self) -> None:
@@ -1171,8 +1202,15 @@ class Conversation(containers.Vertical):
             if diffs:
                 from toad.screens.permissions import PermissionsScreen
 
+                self.app.terminal_alert()
+                self.app.system_notify(
+                    f"{self.agent_title} would like to write files",
+                    title="Permissions request",
+                    sound="question",
+                )
                 permissions_screen = PermissionsScreen(options, diffs)
                 result = await self.app.push_screen_wait(permissions_screen)
+                self.app.terminal_alert(False)
                 result_future.set_result(result)
                 return
 
@@ -1265,6 +1303,11 @@ class Conversation(containers.Vertical):
                 "Clear conversation window",
                 "<optional number of lines to preserve>",
             ),
+            SlashCommand(
+                "/toad:rename",
+                "Give the current session a friendly name",
+                "<session name>",
+            ),
         ]
 
         slash_commands.extend(self.agent_slash_commands)
@@ -1298,7 +1341,11 @@ class Conversation(containers.Vertical):
                 assert self._agent_data is not None
                 from toad.acp.agent import Agent
 
-                self.agent = Agent(self.project_path, self._agent_data)
+                self.agent = Agent(
+                    self.project_path,
+                    self._agent_data,
+                    self._agent_session_id,
+                )
                 self.agent.start(self)
 
             self.call_after_refresh(start_agent)
@@ -1781,6 +1828,21 @@ class Conversation(containers.Vertical):
                 )
                 return True
             await self.prune_window(line_count, line_count)
+            return True
+        elif command == "toad:rename":
+            name = parameters.strip()
+            if not name:
+                self.notify(
+                    "Expected a name for the session.\n"
+                    'For example: "add comments to blog"',
+                    title="/toad:rename",
+                    severity="error",
+                )
+                return True
+            if self.agent is not None:
+                await self.agent.set_session_name(name)
+                self.post_message(self.SessionUpdate(name=name))
+                self.flash(f"Renamed session to [b]'{name}'", style="success")
             return True
 
         return False
