@@ -177,9 +177,8 @@ Tap escape *twice* to exit.
             self.refresh()
             self.blur()
             self.post_message(self.Finalized(self))
-
             if not self.state.buffer.height:
-                self.remove()
+                self.display = False
 
     def allow_focus(self) -> bool:
         """Prohibit focus when the terminal is finalized and couldn't accept input."""
