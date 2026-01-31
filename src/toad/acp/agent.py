@@ -123,6 +123,11 @@ class Agent(AgentBase):
         acp_command = toad.get_os_matrix(self._agent_data["run_command"])
         return acp_command
 
+    @property
+    def supports_load_session(self) -> bool:
+        """Does the agent support loading sessions?"""
+        return self.agent_capabilities.get("loadSession", False)
+
     def __rich_repr__(self) -> rich.repr.Result:
         yield self.project_root_path
         yield self.command
@@ -660,14 +665,15 @@ class Agent(AgentBase):
         assert response is not None
         self.session_id = response["sessionId"]
 
-        db = DB()
-        self.session_pk = await db.session_new(
-            "New Session",
-            self._agent_data["name"],
-            self._agent_data["identity"],
-            self.session_id,
-            protocol="acp",
-        )
+        if self.supports_load_session:
+            db = DB()
+            self.session_pk = await db.session_new(
+                "New Session",
+                self._agent_data["name"],
+                self._agent_data["identity"],
+                self.session_id,
+                protocol="acp",
+            )
 
         if (modes := response.get("modes", None)) is not None:
             current_mode = modes["currentModeId"]
