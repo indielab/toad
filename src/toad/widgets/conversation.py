@@ -932,6 +932,7 @@ class Conversation(containers.Vertical):
 
     @on(acp_messages.UserMessage)
     async def on_acp_user_message(self, message: acp_messages.UserMessage):
+        self._agent_thought = None
         self._agent_response = None
         message.stop()
         await self.post(UserInput(message.text))
