@@ -29,7 +29,7 @@ class SessionResumeModal(ModalScreen[Session]):
         with containers.VerticalGroup(id="container"):
             yield widgets.Markdown(HELP)
             yield widgets.Static(
-                "⚠ Most ACP agents currently do not support session resume — this feature is experimental",
+                "⚠ Not all ACP agents currently support resume",
                 classes="warning",
             )
             with containers.Center(id="table-container"):

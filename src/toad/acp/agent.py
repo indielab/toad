@@ -221,6 +221,12 @@ class Agent(AgentBase):
 
         match update:
             case {
+                "sessionUpdate": "user_message_chunk",
+                "content": {"type": type, "text": text},
+            }:
+                self.post_message(messages.UserMessage(type, text))
+
+            case {
                 "sessionUpdate": "agent_message_chunk",
                 "content": {"type": type, "text": text},
             }:

@@ -930,6 +930,12 @@ class Conversation(containers.Vertical):
         self._agent_thought = None
         await self.post_agent_response(message.text)
 
+    @on(acp_messages.UserMessage)
+    async def on_acp_user_message(self, message: acp_messages.UserMessage):
+        self._agent_response = None
+        message.stop()
+        await self.post(UserInput(message.text))
+
     @on(acp_messages.Thinking)
     async def on_acp_agent_thinking(self, message: acp_messages.Thinking):
         message.stop()
