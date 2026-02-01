@@ -844,9 +844,6 @@ class Conversation(containers.Vertical):
         Args:
             stop_reason: The stop reason returned from the Agent, or `None`.
         """
-        if self._agent_thought is not None and self._agent_thought.loading:
-            await self._agent_thought.remove()
-
         self.turn = "client"
         if self._agent_thought is not None and self._agent_thought.loading:
             await self._agent_thought.remove()
