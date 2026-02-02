@@ -12,7 +12,9 @@ LoadingIndicator {
 }
 
 
-
+# Markdown:empty {
+#     display: none;
+# }
 
 Throbber {
     width: 100%;
